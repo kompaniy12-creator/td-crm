@@ -8,6 +8,7 @@ import {
   Calendar, User, AlertTriangle
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import type { Deal, Contact, Activity, Comment } from '@/types'
 import { PIPELINE_STAGES, PIPELINE_LABELS, SALES_PIPELINE, SALES_FINAL_STAGE } from '@/types'
 import { checkContractReadiness } from '@/lib/contract/requirements'
@@ -15,6 +16,8 @@ import { promoteDealToClient } from '@/lib/api/promote'
 import { EditableField } from '@/components/common/EditableField'
 import { PendingChangesProvider, PendingChangesBar } from '@/components/common/PendingChanges'
 import { ContactLinker } from './ContactLinker'
+import { DealReminders } from './DealReminders'
+import { DealAttachments } from './DealAttachments'
 import { ClientJourney } from './ClientJourney'
 
 // Stage bar colors — same as kanban
@@ -143,6 +146,7 @@ export function DealDetail(props: Props) {
 
 function DealDetailInner({ deal, contact, activities, comments }: Props) {
   const router = useRouter()
+  const { user: currentUser } = useCurrentUser()
   const stages = PIPELINE_STAGES[deal.pipeline] || []
   const [activeTab, setActiveTab] = useState<'general' | 'links' | 'history'>('general')
   const [activityTab, setActivityTab] = useState<'task' | 'comment' | 'message'>('task')
@@ -159,12 +163,13 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
 
   async function handleAddComment() {
     if (!comment.trim()) return
+    if (!currentUser) return
     setIsSaving(true)
     const supabase = createClient()
     await supabase.from('comments').insert({
       content: comment,
       deal_id: deal.id,
-      author_id: '00000000-0000-0000-0000-000000000000', // placeholder
+      author_id: currentUser.id,
     })
     setComment('')
     setIsSaving(false)
@@ -504,6 +509,12 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
             <EditableField label="Номер дома / кв." value={meta.house_number} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'house_number' }} />
             <EditableField label="Почтовый индекс" value={meta.postal_code} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'postal_code' }} />
           </div>
+
+          {/* НАПОМИНАНИЯ */}
+          <DealReminders dealId={deal.id} contactId={contact?.id ?? null} />
+
+          {/* ФАЙЛЫ */}
+          <DealAttachments dealId={deal.id} />
         </div>
 
         {/* ─── RIGHT PANEL ─── */}

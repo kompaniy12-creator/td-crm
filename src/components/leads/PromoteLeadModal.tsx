@@ -6,6 +6,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
+import { getCurrentUserId } from '@/lib/hooks/useCurrentUser'
 import { DealCreateForm, type DealFormPrefill } from '@/components/deals/DealCreateForm'
 import type { Lead, Contact } from '@/types'
 
@@ -77,14 +78,17 @@ export function PromoteLeadModal({ open, lead, onClose }: Props) {
                 .from('leads')
                 .update({ status: 'won', contact_id: contactId })
                 .eq('id', lead.id)
-              await supabase.from('activities').insert({
-                type: 'created',
-                description: `Лид переведён в сделку #${dealId}`,
-                lead_id: lead.id,
-                deal_id: dealId,
-                contact_id: contactId,
-                user_id: '00000000-0000-0000-0000-000000000000',
-              })
+              const uid = await getCurrentUserId()
+              if (uid) {
+                await supabase.from('activities').insert({
+                  type: 'created',
+                  description: `Лид переведён в сделку #${dealId}`,
+                  lead_id: lead.id,
+                  deal_id: dealId,
+                  contact_id: contactId,
+                  user_id: uid,
+                })
+              }
             }}
             onSubmitted={({ dealId, dealNumber }) => {
               onClose()

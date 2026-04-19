@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import {
   TrendingUp, Users, CheckSquare, Briefcase, ArrowUpRight,
-  AlertTriangle, Clock, UserPlus, BarChart2
+  AlertTriangle, Clock, UserPlus, BarChart2, Bell
 } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -31,12 +31,22 @@ interface RecentLead {
   created_at: string
 }
 
+interface UpcomingReminder {
+  id: string
+  title: string | null
+  document_expiry_date: string
+  reminder_date: string
+  deal_id: string | null
+  deals?: { id: string; number: number | null; title: string } | null
+}
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats>({
     leads: 0, contacts: 0, tasks: 0, cases: 0,
     newLeadsToday: 0, openDeals: 0, overdueTasks: 0, expiringDocs: 0,
   })
   const [recentLeads, setRecentLeads] = useState<RecentLead[]>([])
+  const [upcomingReminders, setUpcomingReminders] = useState<UpcomingReminder[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -47,6 +57,8 @@ export default function DashboardPage() {
     const supabase = createClient()
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+    const horizon = new Date(today)
+    horizon.setDate(horizon.getDate() + 14)
 
     const [
       { count: leadsCount },
@@ -57,6 +69,7 @@ export default function DashboardPage() {
       { count: openDealsCount },
       { count: overdueCount },
       { data: recent },
+      { data: reminders },
     ] = await Promise.all([
       supabase.from('leads').select('*', { count: 'exact', head: true }),
       supabase.from('contacts').select('*', { count: 'exact', head: true }),
@@ -66,6 +79,13 @@ export default function DashboardPage() {
       supabase.from('deals').select('*', { count: 'exact', head: true }).eq('status', 'open'),
       supabase.from('tasks').select('*', { count: 'exact', head: true }).lt('due_date', new Date().toISOString()).in('status', ['todo', 'in_progress']),
       supabase.from('leads').select('id, first_name, last_name, source, status, created_at').order('created_at', { ascending: false }).limit(5),
+      supabase
+        .from('document_reminders')
+        .select('id, title, document_expiry_date, reminder_date, deal_id, deals(id, number, title)')
+        .eq('status', 'pending')
+        .lte('reminder_date', horizon.toISOString().slice(0, 10))
+        .order('reminder_date', { ascending: true })
+        .limit(10),
     ])
 
     setStats({
@@ -76,9 +96,10 @@ export default function DashboardPage() {
       newLeadsToday: newTodayCount || 0,
       openDeals: openDealsCount || 0,
       overdueTasks: overdueCount || 0,
-      expiringDocs: 0,
+      expiringDocs: (reminders as UpcomingReminder[] | null)?.length || 0,
     })
     setRecentLeads((recent as RecentLead[]) || [])
+    setUpcomingReminders((reminders as UpcomingReminder[] | null) || [])
     setIsLoading(false)
   }
 
@@ -112,6 +133,14 @@ export default function DashboardPage() {
           </Link>
         </div>
       )}
+      {stats.expiringDocs > 0 && (
+        <div className="flex items-center gap-3 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3">
+          <Bell className="h-5 w-5 text-amber-600" />
+          <p className="text-sm text-amber-800">
+            <strong>{stats.expiringDocs}</strong> документов требуют внимания в ближайшие 14 дней
+          </p>
+        </div>
+      )}
 
       {/* Stats cards */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
@@ -135,6 +164,47 @@ export default function DashboardPage() {
             </Link>
           )
         })}
+      </div>
+
+      {/* Upcoming reminders */}
+      <div className="rounded-xl border border-gray-200 bg-white">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+            <Bell className="h-4 w-4 text-amber-500" />
+            Предстоящие напоминания
+          </h2>
+          <span className="text-xs text-gray-400">на ближайшие 14 дней</span>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {upcomingReminders.length === 0 ? (
+            <div className="flex items-center justify-center py-8 text-sm text-gray-400">
+              Нет напоминаний
+            </div>
+          ) : (
+            upcomingReminders.map((r) => {
+              const overdue = new Date(r.reminder_date) <= new Date()
+              const dealNumber = r.deals?.number ?? r.deals?.id
+              return (
+                <div key={r.id} className="flex items-center gap-3 px-5 py-3">
+                  <div className={`h-2 w-2 rounded-full ${overdue ? 'bg-red-500' : 'bg-amber-400'}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{r.title || 'Напоминание'}</p>
+                    <p className="text-xs text-gray-400">
+                      Истекает {r.document_expiry_date} · Напомнить {r.reminder_date}
+                      {r.deals && ` · Сделка #${r.deals.number ?? ''}`}
+                    </p>
+                  </div>
+                  {r.deal_id && (
+                    <Link
+                      href={`/deals/detail/?id=${dealNumber}`}
+                      className="text-xs text-blue-600 hover:underline"
+                    >Открыть →</Link>
+                  )}
+                </div>
+              )
+            })
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

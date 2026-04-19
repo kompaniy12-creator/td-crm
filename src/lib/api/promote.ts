@@ -1,6 +1,7 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
+import { getCurrentUserId } from '@/lib/hooks/useCurrentUser'
 import { checkContractReadiness } from '@/lib/contract/requirements'
 import type { Deal, Contact } from '@/types'
 import {
@@ -113,22 +114,25 @@ export async function promoteDealToClient(
     })
     .eq('id', dealId)
 
-  await supabase.from('activities').insert([
-    {
-      type: 'status_change',
-      description: `Сделка переведена в клиенты → #${clientDeal.id}`,
-      deal_id: dealId,
-      contact_id: deal.contact_id,
-      user_id: '00000000-0000-0000-0000-000000000000',
-    },
-    {
-      type: 'created',
-      description: `Создано из сделки #${dealId} (переход в клиенты)`,
-      deal_id: clientDeal.id,
-      contact_id: deal.contact_id,
-      user_id: '00000000-0000-0000-0000-000000000000',
-    },
-  ])
+  const currentUserId = await getCurrentUserId()
+  if (currentUserId) {
+    await supabase.from('activities').insert([
+      {
+        type: 'status_change',
+        description: `Сделка переведена в клиенты → #${clientDeal.id}`,
+        deal_id: dealId,
+        contact_id: deal.contact_id,
+        user_id: currentUserId,
+      },
+      {
+        type: 'created',
+        description: `Создано из сделки #${dealId} (переход в клиенты)`,
+        deal_id: clientDeal.id,
+        contact_id: deal.contact_id,
+        user_id: currentUserId,
+      },
+    ])
+  }
 
   return {
     clientDealId: clientDeal.id as string,

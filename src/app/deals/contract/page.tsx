@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Download, Printer, Save, ChevronDown, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { getCurrentUserId } from '@/lib/hooks/useCurrentUser'
 import { checkContractReadiness } from '@/lib/contract/requirements'
 import { lookupColumn, lookupValue } from '@/lib/utils/lookup'
 import type { Deal, Contact } from '@/types'
@@ -473,12 +474,15 @@ function ContractView({ state }: { state: ReadyState }) {
         contract_number: state.displayNo,
       }
       await supabase.from('deals').update({ metadata: mergedMeta }).eq('id', state.dealUuid)
-      await supabase.from('activities').insert({
-        type: 'note',
-        description: `Договор № ${state.displayNo} сохранён в карточке сделки`,
-        deal_id: state.dealUuid,
-        user_id: '00000000-0000-0000-0000-000000000000',
-      })
+      const uid = await getCurrentUserId()
+      if (uid) {
+        await supabase.from('activities').insert({
+          type: 'note',
+          description: `Договор № ${state.displayNo} сохранён в карточке сделки`,
+          deal_id: state.dealUuid,
+          user_id: uid,
+        })
+      }
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     } finally {
