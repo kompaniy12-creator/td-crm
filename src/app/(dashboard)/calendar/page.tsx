@@ -76,9 +76,12 @@ export default function CalendarPage() {
       .from('calendar_events')
       .select('*')
       .eq('cancelled', false)
-      .gte('starts_at', range.from.toISOString()).lt('starts_at', range.to.toISOString())
+      // Overlap: starts before range end AND ends after range start. Catches
+      // multi-day events that straddle the week/month boundary.
+      .lt('starts_at', range.to.toISOString())
+      .gt('ends_at', range.from.toISOString())
       .order('starts_at', { ascending: true })
-      .limit(2000)
+      .limit(3000)
     setEvents((data as CalendarEvent[]) || [])
     setLoading(false)
 
@@ -256,7 +259,11 @@ export default function CalendarPage() {
   )
 }
 
-// ============== Month view ==============
+// ============== Month view (Google-style multi-day bars + timed dots) ==============
+const ROW_PX = 22        // height of a single event slot inside a week
+const HEADER_PX = 24     // day-number header height
+const OVERFLOW_PX = 18   // "Ещё N" footer
+
 function MonthView({
   cursor, events, styleFor, onCreate, onEdit,
 }: {
@@ -266,24 +273,17 @@ function MonthView({
   onCreate: (d: Date) => void
   onEdit: (ev: CalendarEvent) => void
 }) {
-  const grid = useMemo(() => {
+  const weeks = useMemo(() => {
     const first = startOfMonth(cursor)
     const start = startOfWeek(first)
-    const days: Date[] = []
-    for (let i = 0; i < 42; i++) days.push(addDays(start, i))
-    return days
-  }, [cursor])
-
-  const eventsByDay = useMemo(() => {
-    const map = new Map<string, CalendarEvent[]>()
-    for (const e of events) {
-      const key = new Date(e.starts_at).toDateString()
-      const arr = map.get(key) || []; arr.push(e); map.set(key, arr)
+    const out: Date[][] = []
+    for (let w = 0; w < 6; w++) {
+      const row: Date[] = []
+      for (let d = 0; d < 7; d++) row.push(addDays(start, w * 7 + d))
+      out.push(row)
     }
-    return map
-  }, [events])
-
-  const today = new Date()
+    return out
+  }, [cursor])
 
   return (
     <div className="flex h-full flex-col">
@@ -292,55 +292,237 @@ function MonthView({
           <div key={d} className="px-2 py-1.5">{d}</div>
         ))}
       </div>
-      <div className="grid flex-1 grid-cols-7 grid-rows-6 overflow-hidden">
-        {grid.map((day) => {
+      <div className="flex min-h-0 flex-1 flex-col">
+        {weeks.map((week, wi) => (
+          <WeekRow
+            key={wi}
+            week={week}
+            cursor={cursor}
+            events={events}
+            styleFor={styleFor}
+            onCreate={onCreate}
+            onEdit={onEdit}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function WeekRow({
+  week, cursor, events, styleFor, onCreate, onEdit,
+}: {
+  week: Date[]
+  cursor: Date
+  events: CalendarEvent[]
+  styleFor: (ev: CalendarEvent) => { background: string; color: string; border: string }
+  onCreate: (d: Date) => void
+  onEdit: (ev: CalendarEvent) => void
+}) {
+  const today = new Date()
+  const weekStart = startOfDay(week[0])
+  const weekEnd = addDays(weekStart, 7)
+
+  // Classify + layout all segments for this week.
+  const layout = useMemo(() => {
+    interface Seg {
+      event: CalendarEvent
+      startCol: number
+      endCol: number
+      isBar: boolean // multi-day or all-day -> filled bar; else timed dot
+    }
+    const segs: Seg[] = []
+    for (const e of events) {
+      const s = new Date(e.starts_at)
+      const en = new Date(e.ends_at)
+      if (!(s < weekEnd && en > weekStart)) continue
+      // Google treats end-exclusive for all_day events. For timed events, the
+      // end is the actual end instant.
+      const effectiveEnd = new Date(en.getTime() - 1)
+      const startCol = Math.max(0, Math.floor((startOfDay(s).getTime() - weekStart.getTime()) / 86400_000))
+      const endCol = Math.min(6, Math.floor((startOfDay(effectiveEnd).getTime() - weekStart.getTime()) / 86400_000))
+      if (endCol < 0 || startCol > 6) continue
+      const spanDays = endCol - startCol + 1
+      const isBar = e.all_day || spanDays > 1
+      segs.push({ event: e, startCol, endCol, isBar })
+    }
+
+    // Sort: bars first (longer spans first, then earlier start), then timed by start time.
+    segs.sort((a, b) => {
+      if (a.isBar !== b.isBar) return a.isBar ? -1 : 1
+      if (a.isBar) {
+        const la = a.endCol - a.startCol; const lb = b.endCol - b.startCol
+        if (la !== lb) return lb - la
+        if (a.startCol !== b.startCol) return a.startCol - b.startCol
+      } else {
+        const ta = new Date(a.event.starts_at).getTime()
+        const tb = new Date(b.event.starts_at).getTime()
+        if (ta !== tb) return ta - tb
+      }
+      return (a.event.title || '').localeCompare(b.event.title || '')
+    })
+
+    // Track packing: unlimited tracks for computation; we'll trim visually.
+    const tracks: { endCol: number }[][] = []
+    const placed: (Seg & { track: number })[] = []
+    for (const seg of segs) {
+      let t = 0
+      for (; t < tracks.length; t++) {
+        const row = tracks[t]
+        const conflict = row.some(r => !(seg.endCol < (r as any).startCol || seg.startCol > (r as any).endCol))
+        if (!conflict) break
+      }
+      if (t === tracks.length) tracks.push([])
+      tracks[t].push({ ...seg } as any)
+      placed.push({ ...seg, track: t })
+    }
+    return placed
+  }, [events, weekStart, weekEnd])
+
+  // Figure out how many tracks fit based on available height.
+  // We use flex-1 weeks, so the row container's height = total / 6. We reserve
+  // HEADER_PX for day numbers + OVERFLOW_PX for potential "+N ещё" and fill
+  // the rest with ROW_PX slots. We compute at render time via ResizeObserver.
+  const { ref, maxTracks } = useAvailableTracks()
+
+  // Determine visible placed segments and per-day overflow count.
+  const visible: typeof layout = []
+  const overflowByDay = [0, 0, 0, 0, 0, 0, 0]
+  for (const seg of layout) {
+    if (seg.track < maxTracks) {
+      visible.push(seg)
+    } else {
+      for (let c = seg.startCol; c <= seg.endCol; c++) overflowByDay[c]++
+    }
+  }
+
+  return (
+    <div
+      ref={ref}
+      className="relative min-h-[90px] flex-1 border-b border-gray-200"
+    >
+      {/* Day cell backdrop */}
+      <div className="absolute inset-0 grid grid-cols-7">
+        {week.map((day, ci) => {
           const isCurMonth = day.getMonth() === cursor.getMonth()
           const isToday = sameDay(day, today)
-          const dayEvents = eventsByDay.get(day.toDateString()) || []
           return (
             <div
-              key={day.toISOString()}
-              className={`flex min-h-0 flex-col border-b border-r border-gray-100 p-1 ${
-                isCurMonth ? 'bg-white' : 'bg-gray-50/50'
-              }`}
+              key={ci}
+              className={`relative border-r border-gray-100 ${isCurMonth ? 'bg-white' : 'bg-gray-50/50'}`}
               onDoubleClick={() => onCreate(day)}
             >
-              <div className="flex items-center justify-between">
-                <span className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full text-[11px] ${
+              <div className="pt-1 text-center">
+                <span className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs ${
                   isToday ? 'bg-blue-600 font-bold text-white'
                   : isCurMonth ? 'text-gray-700' : 'text-gray-400'
                 }`}>{day.getDate()}</span>
               </div>
-              <div className="mt-0.5 flex flex-col gap-0.5 overflow-y-auto text-[11px]">
-                {dayEvents.slice(0, 4).map((ev) => {
-                  const s = styleFor(ev)
-                  return (
-                    <button
-                      key={ev.id}
-                      onClick={() => onEdit(ev)}
-                      className="truncate rounded px-1.5 py-0.5 text-left hover:brightness-95"
-                      style={s}
-                      title={ev.title}
-                    >
-                      {!ev.all_day && (
-                        <span className="mr-1 text-[10px] opacity-80">
-                          {fmtTime(new Date(ev.starts_at))}
-                        </span>
-                      )}
-                      {ev.title || '(без названия)'}
-                    </button>
-                  )
-                })}
-                {dayEvents.length > 4 && (
-                  <span className="text-[10px] text-gray-400">+ ещё {dayEvents.length - 4}</span>
-                )}
-              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Events overlay */}
+      <div className="pointer-events-none absolute inset-0">
+        {visible.map((seg) => {
+          const s = styleFor(seg.event)
+          const leftPct = (seg.startCol / 7) * 100
+          const widthPct = ((seg.endCol - seg.startCol + 1) / 7) * 100
+          const top = HEADER_PX + seg.track * ROW_PX
+          if (seg.isBar) {
+            // Continuous filled bar. Omit rounded corners when it continues
+            // across week boundaries.
+            const startsBefore = seg.event.starts_at < weekStart.toISOString()
+            const endsAfter = seg.event.ends_at > weekEnd.toISOString()
+            return (
+              <button
+                key={seg.event.id + '_' + seg.startCol}
+                onClick={(e) => { e.stopPropagation(); onEdit(seg.event) }}
+                className="pointer-events-auto absolute overflow-hidden truncate px-2 text-left text-[11px] font-medium shadow-sm hover:brightness-95"
+                style={{
+                  top: `${top}px`,
+                  left: `calc(${leftPct}% + 2px)`,
+                  width: `calc(${widthPct}% - 4px)`,
+                  height: `${ROW_PX - 3}px`,
+                  lineHeight: `${ROW_PX - 3}px`,
+                  borderRadius: `${startsBefore ? 0 : 6}px ${endsAfter ? 0 : 6}px ${endsAfter ? 0 : 6}px ${startsBefore ? 0 : 6}px`,
+                  ...s,
+                }}
+                title={seg.event.title}
+              >
+                {seg.event.title || '(без названия)'}
+              </button>
+            )
+          }
+          // Timed event: colored dot + time + title
+          const color = s.background
+          return (
+            <button
+              key={seg.event.id}
+              onClick={(e) => { e.stopPropagation(); onEdit(seg.event) }}
+              className="pointer-events-auto absolute flex items-center gap-1.5 truncate px-2 text-left text-[11px] text-gray-800 hover:bg-gray-100/80"
+              style={{
+                top: `${top}px`,
+                left: `calc(${leftPct}% + 2px)`,
+                width: `calc(${widthPct}% - 4px)`,
+                height: `${ROW_PX - 3}px`,
+                lineHeight: `${ROW_PX - 3}px`,
+                borderRadius: 4,
+              }}
+              title={`${fmtTime(new Date(seg.event.starts_at))} ${seg.event.title}`}
+            >
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: color }} />
+              <span className="shrink-0 tabular-nums text-gray-600">
+                {fmtTime(new Date(seg.event.starts_at))}
+              </span>
+              <span className="truncate">{seg.event.title || '(без названия)'}</span>
+            </button>
+          )
+        })}
+
+        {/* Per-day overflow labels */}
+        {overflowByDay.map((n, ci) => {
+          if (!n) return null
+          const leftPct = (ci / 7) * 100
+          const widthPct = 100 / 7
+          return (
+            <div
+              key={'ov_' + ci}
+              className="absolute truncate px-2 text-[11px] text-gray-500"
+              style={{
+                bottom: 2,
+                left: `calc(${leftPct}% + 2px)`,
+                width: `calc(${widthPct}% - 4px)`,
+              }}
+            >
+              Ещё {n}
             </div>
           )
         })}
       </div>
     </div>
   )
+}
+
+// Measure the week-row container and compute how many event tracks fit.
+function useAvailableTracks() {
+  const ref = useRef<HTMLDivElement>(null)
+  const [maxTracks, setMaxTracks] = useState(3)
+  useEffect(() => {
+    if (!ref.current) return
+    const measure = () => {
+      if (!ref.current) return
+      const h = ref.current.clientHeight
+      const usable = Math.max(0, h - HEADER_PX - OVERFLOW_PX)
+      setMaxTracks(Math.max(1, Math.floor(usable / ROW_PX)))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(ref.current)
+    return () => ro.disconnect()
+  }, [])
+  return { ref, maxTracks }
 }
 
 // ============== Day / Week time-grid ==============
