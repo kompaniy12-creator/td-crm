@@ -40,7 +40,7 @@ export function Header() {
   }
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-white/15 bg-white/10 backdrop-blur-xl px-6 shadow-sm group-data-[theme=dark]/theme:bg-slate-900/15 group-data-[theme=dark]/theme:border-white/10">
+    <header className="flex h-14 items-center justify-between border-b border-white/15 bg-white/10 backdrop-blur-xl px-6 shadow-sm group-data-[theme=dark]/theme:bg-slate-900/10 group-data-[theme=dark]/theme:border-white/10">
       <div className="flex items-center gap-4">
         <h1 className="text-[15px] font-semibold text-gray-900 group-data-[theme=dark]/theme:text-gray-100">{title}</h1>
       </div>
