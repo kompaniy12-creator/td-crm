@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import { useUIStore } from '@/lib/store/ui.store'
+import { useUnreadChats } from '@/lib/hooks/useUnreadChats'
 
 const navItems = [
   { href: '/', icon: Home, label: 'Дашборд' },
@@ -34,6 +35,7 @@ const navItems = [
 export function Sidebar() {
   const pathname = usePathname()
   const { sidebarCollapsed, toggleSidebar } = useUIStore()
+  const unreadChats = useUnreadChats()
 
   return (
     <aside
@@ -89,13 +91,14 @@ export function Sidebar() {
               ? pathname === '/'
               : pathname.startsWith(item.href)
             const Icon = item.icon
+            const badge = item.href === '/chats' && unreadChats > 0 ? unreadChats : 0
 
             return (
               <li key={item.href}>
                 <Link
                   href={item.href}
                   className={cn(
-                    'group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-all',
+                    'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-all',
                     isActive
                       ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30 group-data-[theme=dark]/theme:bg-blue-500'
                       : 'text-gray-600 hover:bg-white hover:text-gray-900 group-data-[theme=dark]/theme:text-gray-300 group-data-[theme=dark]/theme:hover:bg-white/10 backdrop-blur-sm group-data-[theme=dark]/theme:hover:text-white',
@@ -103,15 +106,30 @@ export function Sidebar() {
                   )}
                   title={sidebarCollapsed ? item.label : undefined}
                 >
-                  <Icon
-                    className={cn(
-                      'h-[18px] w-[18px] flex-shrink-0 transition-colors',
-                      isActive
-                        ? 'text-white'
-                        : 'text-gray-400 group-hover:text-gray-700 group-data-[theme=dark]/theme:text-gray-400 group-data-[theme=dark]/theme:group-hover:text-white'
+                  <span className="relative flex-shrink-0">
+                    <Icon
+                      className={cn(
+                        'h-[18px] w-[18px] transition-colors',
+                        isActive
+                          ? 'text-white'
+                          : 'text-gray-400 group-hover:text-gray-700 group-data-[theme=dark]/theme:text-gray-400 group-data-[theme=dark]/theme:group-hover:text-white'
+                      )}
+                    />
+                    {sidebarCollapsed && badge > 0 && (
+                      <span className="absolute -right-1.5 -top-1.5 flex min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-4 text-white ring-2 ring-white group-data-[theme=dark]/theme:ring-slate-900">
+                        {badge > 99 ? '99+' : badge}
+                      </span>
                     )}
-                  />
+                  </span>
                   {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                  {!sidebarCollapsed && badge > 0 && (
+                    <span className={cn(
+                      'ml-auto inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold leading-5',
+                      isActive ? 'bg-white text-blue-700' : 'bg-red-500 text-white'
+                    )}>
+                      {badge > 99 ? '99+' : badge}
+                    </span>
+                  )}
                 </Link>
               </li>
             )

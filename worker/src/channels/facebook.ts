@@ -143,7 +143,7 @@ export async function pollFacebook(it: Integration) {
           const contactId = await resolveContact({
             displayName: peer.name || peer.username || peer.id,
           })
-          const threadId = await upsertThread({
+          const threadId = await upsertThread({ channel: it.kind,
             integrationId: it.id,
             externalThreadId: `${page.id}:${conv.id}`,
             contactId,
@@ -270,7 +270,7 @@ export async function handleFacebookWebhook(body: MetaBody) {
         // Conversation id we don't get in webhook payload — use `${pageId}:${senderId}`
         // as stable composite, matching what send() and poll agree on if we migrate.
         const externalThreadId = `${page.id}:${senderId}`
-        const threadId = await upsertThread({
+        const threadId = await upsertThread({ channel: it.kind,
           integrationId: it.id,
           externalThreadId,
           contactId,

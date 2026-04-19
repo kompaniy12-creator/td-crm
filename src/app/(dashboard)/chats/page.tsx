@@ -37,23 +37,22 @@ export default function ChatsPage() {
       .eq('thread_id', threadId)
       .order('created_at', { ascending: true })
     setMessages((data as ChatMessage[]) || [])
-    if (selectedUnreadRef.current) {
-      await supabase
-        .from('chat_threads')
-        .update({ unread_count: 0 })
-        .eq('id', threadId)
-    }
   }, [])
 
-  const selectedUnreadRef = useRef(false)
+  const markRead = useCallback(async (threadId: string) => {
+    const supabase = createClient()
+    // Optimistic local zero so the badge disappears instantly.
+    setThreads((prev) => prev.map((t) => (t.id === threadId ? { ...t, unread_count: 0 } : t)))
+    await supabase.from('chat_threads').update({ unread_count: 0 }).eq('id', threadId)
+  }, [])
 
   useEffect(() => { loadThreads() }, [loadThreads])
 
   useEffect(() => {
     if (!selected) { setMessages([]); return }
-    selectedUnreadRef.current = (selected.unread_count || 0) > 0
     loadMessages(selected.id)
-  }, [selected, loadMessages])
+    if ((selected.unread_count || 0) > 0) markRead(selected.id)
+  }, [selected, loadMessages, markRead])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -68,12 +67,13 @@ export default function ChatsPage() {
         const msg = payload.new as ChatMessage
         if (selected && msg.thread_id === selected.id) {
           setMessages((m) => [...m, msg])
+          if (msg.direction === 'inbound') markRead(selected.id)
         }
         loadThreads()
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [selected, loadThreads])
+  }, [selected, loadThreads, markRead])
 
   async function sendMessage() {
     if (!text.trim() || !selected || !user) return

@@ -117,7 +117,14 @@ async function drainOutbound() {
     .limit(20)
   if (error) { log.error({ err: error.message }, 'drainOutbound'); return }
   for (const msg of (data || []) as ChatMessageRow[]) {
-    await supabase.from('chat_messages').update({ status: 'sending' }).eq('id', msg.id)
+    // Atomic claim: flip queued→sent so no parallel tick picks this row again.
+    // If send fails we flip to 'failed'. (Schema allows: queued/sent/delivered/read/failed.)
+    const { data: claimed, error: claimErr } = await supabase
+      .from('chat_messages')
+      .update({ status: 'sent' })
+      .eq('id', msg.id).eq('status', 'queued')
+      .select('id').maybeSingle()
+    if (claimErr || !claimed) continue // another tick grabbed it
     try {
       const { data: thr } = await supabase
         .from('chat_threads')
@@ -155,8 +162,9 @@ async function drainOutbound() {
           throw new Error(`Отправка для kind='${integration.kind}' пока не реализована`)
       }
       await supabase.from('chat_messages').update({
-        status: 'sent', sent_at: new Date().toISOString(),
-        external_message_id: externalId || null, error: null,
+        status: 'sent',
+        external_id: externalId || null,
+        error: null,
       }).eq('id', msg.id)
     } catch (e: any) {
       log.error({ err: e.message, id: msg.id }, 'send failed')

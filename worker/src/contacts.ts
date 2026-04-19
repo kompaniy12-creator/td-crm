@@ -50,6 +50,7 @@ export async function resolveContact(key: ContactKey): Promise<string> {
 
 export interface ThreadKey {
   integrationId: string
+  channel: string
   externalThreadId: string
   contactId?: string | null
   title?: string
@@ -72,6 +73,7 @@ export async function upsertThread(k: ThreadKey): Promise<string> {
     .from('chat_threads')
     .insert({
       integration_id: k.integrationId,
+      channel: k.channel,
       external_thread_id: k.externalThreadId,
       contact_id: k.contactId || null,
       title: k.title || null,
@@ -86,17 +88,18 @@ export async function insertInbound(opts: {
   threadId: string
   integrationId: string
   externalMessageId?: string
+  senderName?: string
   body: string
   attachments?: unknown
 }) {
   const { error } = await supabase.from('chat_messages').insert({
     thread_id: opts.threadId,
-    integration_id: opts.integrationId,
     direction: 'inbound',
-    external_message_id: opts.externalMessageId || null,
+    external_id: opts.externalMessageId || null,
+    sender_name: opts.senderName || null,
     body: opts.body,
-    attachments: opts.attachments || null,
-    status: 'received',
+    attachments: opts.attachments || [],
+    status: 'sent',
   })
   if (error) throw error
 }

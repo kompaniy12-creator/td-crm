@@ -67,7 +67,7 @@ export async function startWhatsAppQR(it: Integration) {
           phone: phone || undefined,
           displayName: msg.pushName || phone || undefined,
         })
-        const threadId = await upsertThread({
+        const threadId = await upsertThread({ channel: it.kind,
           integrationId: it.id,
           externalThreadId: jid,
           contactId,

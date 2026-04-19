@@ -80,7 +80,7 @@ export async function pollGmail(it: Integration) {
       const subject = headers.find((h) => h.name === 'Subject')?.value || '(без темы)'
       const emailMatch = from.match(/<(.+?)>/)?.[1] || from
       const contactId = await resolveContact({ email: emailMatch, displayName: from })
-      const threadId = await upsertThread({
+      const threadId = await upsertThread({ channel: it.kind,
         integrationId: it.id,
         externalThreadId: msg.data.threadId!,
         contactId,

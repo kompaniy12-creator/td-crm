@@ -20,7 +20,7 @@ export async function startTelegramBot(it: Integration) {
         telegram: from?.username || undefined,
         displayName: [from?.first_name, from?.last_name].filter(Boolean).join(' ') || from?.username,
       })
-      const threadId = await upsertThread({
+      const threadId = await upsertThread({ channel: it.kind,
         integrationId: it.id,
         externalThreadId: String(msg.chat.id),
         contactId,

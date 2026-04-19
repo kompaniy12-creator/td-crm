@@ -36,7 +36,7 @@ export async function startTelegramPersonal(it: Integration) {
     await client.connect()
     sessions.set(it.id, { client, apiId, apiHash })
     await updateIntegration(it.id, { status: 'active', last_error: null })
-    client.addEventHandler((event: NewMessageEvent) => onMessage(it, event).catch((e) => log.error({ err: e.message }, 'tg personal msg')), new NewMessage({ incoming: true }))
+    attachMessageHandler(it, client)
     log.info({ id: it.id }, 'telegram_personal connected')
   } catch (e: any) {
     await setError(it.id, e.message)
@@ -70,9 +70,10 @@ async function driveOtpFlow(it: Integration, apiId: number, apiHash: string) {
     const s = sessions.get(it.id)
     if (!s || !code) { await setError(it.id, 'Нет активной сессии/кода'); return }
     try {
+      const { Api } = await import('telegram/tl/index.js')
       await s.client.invoke(
-        // @ts-ignore - use low-level signIn via start with custom prompts
-        (await import('telegram/tl/index.js')).Api.auth.SignIn({
+        // @ts-ignore
+        new Api.auth.SignIn({
           phoneNumber: phone!,
           phoneCodeHash: s.phoneCodeHash!,
           phoneCode: code,
@@ -92,6 +93,9 @@ async function driveOtpFlow(it: Integration, apiId: number, apiHash: string) {
       credentials: { ...(it.credentials || {}), session: sessionString },
       auth_state: { phase: 'connected' },
     })
+    attachMessageHandler(it, s.client)
+    log.info({ id: it.id }, 'telegram_personal signed in')
+    return
   }
 
   if (phase === 'awaiting_2fa' && as.two_factor_code) {
@@ -107,10 +111,19 @@ async function driveOtpFlow(it: Integration, apiId: number, apiHash: string) {
         credentials: { ...(it.credentials || {}), session: sessionString },
         auth_state: { phase: 'connected' },
       })
+      attachMessageHandler(it, s.client)
+      log.info({ id: it.id }, 'telegram_personal signed in with 2fa')
     } catch (e: any) {
       await setError(it.id, e.message)
     }
   }
+}
+
+function attachMessageHandler(it: Integration, client: TelegramClient) {
+  client.addEventHandler(
+    (event: NewMessageEvent) => onMessage(it, event).catch((e) => log.error({ err: e.message }, 'tg personal msg')),
+    new NewMessage({ incoming: true }),
+  )
 }
 
 async function onMessage(it: Integration, event: NewMessageEvent) {
@@ -122,7 +135,7 @@ async function onMessage(it: Integration, event: NewMessageEvent) {
     phone: sender?.phone ? `+${sender.phone}` : undefined,
     displayName: [sender?.firstName, sender?.lastName].filter(Boolean).join(' ') || sender?.username,
   })
-  const threadId = await upsertThread({
+  const threadId = await upsertThread({ channel: it.kind,
     integrationId: it.id,
     externalThreadId: String(msg.chatId || msg.peerId),
     contactId,
