@@ -546,11 +546,11 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
               <>
                 <EditableField label="Имя" value={contact.first_name} target={{ kind: 'contact', contactId: contact.id, column: 'first_name' }} required />
                 <EditableField label="Фамилия" value={contact.last_name} target={{ kind: 'contact', contactId: contact.id, column: 'last_name' }} required />
-                <EditableField label="Телефон" value={contact.phone} target={{ kind: 'contact', contactId: contact.id, column: 'phone' }} type="tel" required />
-                <EditableField label="Email" value={contact.email} target={{ kind: 'contact', contactId: contact.id, column: 'email' }} type="email" required />
-                <EditableField label="Второй телефон" value={contact.phone2} target={{ kind: 'contact', contactId: contact.id, column: 'phone2' }} type="tel" />
-                <EditableField label="Telegram" value={contact.telegram} target={{ kind: 'contact', contactId: contact.id, column: 'telegram' }} />
-                <EditableField label="WhatsApp" value={contact.whatsapp} target={{ kind: 'contact', contactId: contact.id, column: 'whatsapp' }} />
+                <EditableField label="Телефон" value={contact.phone} target={{ kind: 'contact', contactId: contact.id, column: 'phone' }} type="tel" required immediate />
+                <EditableField label="Email" value={contact.email} target={{ kind: 'contact', contactId: contact.id, column: 'email' }} type="email" required immediate />
+                <EditableField label="Второй телефон" value={contact.phone2} target={{ kind: 'contact', contactId: contact.id, column: 'phone2' }} type="tel" immediate />
+                <EditableField label="Telegram" value={contact.telegram} target={{ kind: 'contact', contactId: contact.id, column: 'telegram' }} placeholder="@username" immediate />
+                <EditableField label="WhatsApp" value={contact.whatsapp} target={{ kind: 'contact', contactId: contact.id, column: 'whatsapp' }} type="tel" placeholder="+48..." immediate />
                 <EditableField label="Гражданство" value={contact.nationality} target={{ kind: 'contact', contactId: contact.id, column: 'nationality' }} />
                 <EditableField label="Дата рождения" value={contact.date_of_birth} target={{ kind: 'contact', contactId: contact.id, column: 'date_of_birth' }} type="date" />
                 <EditableField label="Серия паспорта" value={contact.passport_series} target={{ kind: 'contact', contactId: contact.id, column: 'passport_series' }} required />

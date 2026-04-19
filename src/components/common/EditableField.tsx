@@ -13,10 +13,12 @@ export interface EditableFieldProps {
   type?: 'text' | 'number' | 'date' | 'email' | 'tel' | 'textarea'
   placeholder?: string
   format?: (v: string | number) => string
+  /** Bypass the PendingChanges buffer and save to DB immediately on commit. */
+  immediate?: boolean
 }
 
 export function EditableField({
-  label, value, target, required = false, type = 'text', placeholder, format,
+  label, value, target, required = false, type = 'text', placeholder, format, immediate = false,
 }: EditableFieldProps) {
   const router = useRouter()
   const pending = usePendingChanges()
@@ -48,7 +50,7 @@ export function EditableField({
     const val = parseDraft()
 
     // Buffered mode: stage into context, show Save button in parent bar
-    if (pending) {
+    if (pending && !immediate) {
       // If reverted to DB value, discard staged entry
       const dbCurrent = value == null ? '' : String(value)
       if (draft === dbCurrent) {
