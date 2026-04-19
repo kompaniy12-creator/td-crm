@@ -227,18 +227,24 @@ export default function MailPage() {
   }, [selected, loadMessages, markRead])
 
   useEffect(() => {
+    // Debounce realtime-driven reloads. During Gmail backfill the worker
+    // fires dozens of chat_threads UPDATEs per second; reloading on every
+    // one makes the UI flicker. Collapse them to one reload per 800ms.
+    let t: any = null
+    const scheduleReload = () => {
+      if (t) return
+      t = setTimeout(() => { t = null; loadThreads(); loadCounts() }, 800)
+    }
     const ch = supabase
       .channel('mail-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_threads' }, () => {
-        loadThreads(); loadCounts()
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_threads' }, scheduleReload)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (p) => {
         const msg = p.new as ChatMessage
         if (selected && msg.thread_id === selected.id) setMessages((m) => [...m, msg])
       })
       .subscribe()
     const iv = setInterval(() => { loadIntegration() }, 30_000)
-    return () => { supabase.removeChannel(ch); clearInterval(iv) }
+    return () => { if (t) clearTimeout(t); supabase.removeChannel(ch); clearInterval(iv) }
   }, [supabase, selected, loadThreads, loadCounts, loadIntegration])
 
   // ---------------------------------------------------------

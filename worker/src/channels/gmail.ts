@@ -153,15 +153,30 @@ function classifyLabels(labelIds: string[]): {
 // ------------------------------------------------------------
 // Import a single Gmail message (idempotent via external_id dedupe).
 // ------------------------------------------------------------
-async function recomputeThreadUnread(threadId: string) {
+async function recomputeThread(threadId: string) {
+  // Recompute thread-level last_message_at / preview / direction / unread_count
+  // from actual chat_messages. We must do this explicitly because UPDATEs
+  // during re-import don't fire the INSERT trigger that normally maintains
+  // these fields, and historical messages inserted out-of-order need their
+  // true dates to surface.
+  const { data: newest } = await supabase
+    .from('chat_messages')
+    .select('created_at, body, direction')
+    .eq('thread_id', threadId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
   const { count } = await supabase
     .from('chat_messages')
     .select('id', { count: 'exact', head: true })
     .eq('thread_id', threadId)
     .eq('unread', true)
-  await supabase.from('chat_threads')
-    .update({ unread_count: count || 0 })
-    .eq('id', threadId)
+  await supabase.from('chat_threads').update({
+    last_message_at: newest?.created_at || null,
+    last_message_preview: newest ? String(newest.body || '').slice(0, 200) : null,
+    last_message_direction: (newest?.direction as any) || null,
+    unread_count: count || 0,
+  }).eq('id', threadId)
 }
 
 async function importMessage(gmail: any, it: Integration, id: string) {
@@ -231,7 +246,7 @@ async function importMessage(gmail: any, it: Integration, id: string) {
       attachments: attachmentList,
       ...(messageDate ? { created_at: messageDate } : {}),
     }).eq('external_id', id)
-    await recomputeThreadUnread(threadId)
+    await recomputeThread(threadId)
     return
   }
 
@@ -279,7 +294,7 @@ async function importMessage(gmail: any, it: Integration, id: string) {
     })
   }
 
-  await recomputeThreadUnread(threadId)
+  await recomputeThread(threadId)
 }
 
 // ------------------------------------------------------------
