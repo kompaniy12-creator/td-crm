@@ -163,6 +163,8 @@ export interface Deal {
   // Relations
   contact_id?: string
   lead_id?: string
+  // Joined contact (when fetched with select('*, contacts(...)'))
+  contacts?: { id: string; first_name: string; last_name: string; phone?: string } | null
   // Financial
   amount?: number
   currency: 'PLN' | 'UAH' | 'EUR' | 'USD'
@@ -174,6 +176,9 @@ export interface Deal {
   // Meta
   description?: string
   tags?: string[]
+  source?: string
+  // Pipeline-specific custom fields (stored as JSONB)
+  metadata?: Record<string, unknown>
   created_at: string
   updated_at: string
 }
@@ -289,21 +294,29 @@ export interface Activity {
 
 export const PIPELINE_STAGES: Record<DealPipeline, string[]> = {
   sales: [
-    'Новый лид',
+    'Новая заявка',
     'Первый контакт',
-    'Консультация',
+    'Консультация по телефону',
+    'Встреча назначена',
+    'Встреча состоялась',
     'Коммерческое предложение',
-    'Ожидание оплаты',
-    'Оплачено',
+    'Договор подписан',
+    'Предоплата получена',
   ],
   legalization: [
-    'Новая заявка',
-    'Сбор документов',
-    'Запись на прием',
-    'Подача документов',
-    'Ожидание решения',
-    'Карта готова',
-    'Закрыт',
+    'Новый проект',
+    'Контроль предоплаты',
+    'Подготовка документов',
+    'Документы готовы',
+    'Документы поданы (ждём подтверждение регистрации)',
+    'Ожидание дооплаты',
+    'Приглашение на отпечатки',
+    'Рассмотрение дела',
+    'Вызов — доп. документы',
+    'Негативное решение',
+    'Положительное решение',
+    'Печать документов',
+    'Документы готовы к получению',
   ],
   drivers_license: [
     'Новая заявка',
@@ -371,17 +384,25 @@ export const PIPELINE_STAGES: Record<DealPipeline, string[]> = {
 }
 
 export const PIPELINE_LABELS: Record<DealPipeline, string> = {
-  sales: 'Продажи',
-  legalization: 'Легализация',
+  sales: 'Сделки (Продажи → Договор)',
+  legalization: 'Клиенты (Легализация)',
   drivers_license: 'Водительские удостоверения',
   accounting: 'Бухгалтерия и кадры',
-  active_clients: 'Действующие клиенты',
+  active_clients: 'Действующие клиенты (Бухгалтерия)',
   international_protection: 'Международная защита',
   current_clients: 'Текущие клиенты',
   ukr_warmup: 'Статус UKR прогрев',
   incorrect_applications: 'Некорректные заявки',
   company_registration: 'Регистрация компаний',
 }
+
+// The LAST stage of the sales pipeline — reaching it means the deal is ready
+// to be promoted into a client pipeline. Changing this constant updates both
+// the UI and the server-side guards simultaneously.
+export const SALES_FINAL_STAGE = 'Предоплата получена'
+export const CLIENT_INITIAL_STAGE = 'Новый проект'
+export const CLIENT_PIPELINE: DealPipeline = 'legalization'
+export const SALES_PIPELINE: DealPipeline = 'sales'
 
 export const SOURCE_LABELS: Record<LeadSource, string> = {
   website: 'Сайт',
