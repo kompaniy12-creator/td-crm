@@ -8,6 +8,7 @@ type Target =
   | { kind: 'deal'; dealId: string; column: string }
   | { kind: 'deal_meta'; dealId: string; metaKey: string }
   | { kind: 'contact'; contactId: string; column: string }
+  | { kind: 'lead'; leadId: string; column: string }
 
 export interface EditableFieldProps {
   label: string
@@ -54,6 +55,8 @@ export function EditableField({
         await supabase.from('deals').update({ metadata: newMeta }).eq('id', target.dealId)
       } else if (target.kind === 'contact') {
         await supabase.from('contacts').update({ [target.column]: val }).eq('id', target.contactId)
+      } else if (target.kind === 'lead') {
+        await supabase.from('leads').update({ [target.column]: val }).eq('id', target.leadId)
       }
     } finally {
       setSaving(false)

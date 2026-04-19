@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { LayoutGrid, List, Filter, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LeadsKanban } from '@/components/leads/LeadsKanban'
@@ -11,7 +12,9 @@ import { createClient } from '@/lib/supabase/client'
 import type { Lead } from '@/types'
 
 export default function LeadsPage() {
+  const router = useRouter()
   const { leadsView, setLeadsView, createLeadOpen, setCreateLeadOpen } = useUIStore()
+  const openLead = (lead: Lead) => router.push(`/leads/detail/?id=${lead.id}`)
   const [leads, setLeads] = useState<Lead[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedSource, setSelectedSource] = useState<string>('all')
@@ -94,10 +97,10 @@ export default function LeadsPage() {
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
           </div>
         ) : leadsView === 'kanban' ? (
-          <LeadsKanban leads={leads} />
+          <LeadsKanban leads={leads} onLeadClick={openLead} />
         ) : (
           <div className="p-4">
-            <LeadsList leads={leads} />
+            <LeadsList leads={leads} onLeadClick={openLead} />
           </div>
         )}
       </div>
