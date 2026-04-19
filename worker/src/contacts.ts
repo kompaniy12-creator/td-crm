@@ -9,43 +9,30 @@ export interface ContactKey {
 }
 
 /**
- * Find an existing contact by any identifier, or create a skeleton one.
- * Returns the contact id.
+ * Look up an existing contact by any identifier. Returns `null` if not found.
+ *
+ * We deliberately do NOT auto-create a contact from inbound messages —
+ * contacts are a sales-side concept and are created explicitly when a lead
+ * is converted to a deal (or when the operator ticks "also create contact"
+ * on lead creation, or when a deal is created directly). Chat threads for
+ * unknown senders simply stay with `contact_id = null` until an operator
+ * attaches them.
  */
-export async function resolveContact(key: ContactKey): Promise<string> {
+export async function resolveContact(key: ContactKey): Promise<string | null> {
   const filters: string[] = []
   if (key.phone) filters.push(`phone.eq.${key.phone}`)
   if (key.email) filters.push(`email.eq.${key.email}`)
   if (key.telegram) filters.push(`telegram.eq.${key.telegram}`)
   if (key.whatsapp) filters.push(`whatsapp.eq.${key.whatsapp}`)
+  if (!filters.length) return null
 
-  if (filters.length) {
-    const { data } = await supabase
-      .from('contacts')
-      .select('id')
-      .or(filters.join(','))
-      .limit(1)
-      .maybeSingle()
-    if (data?.id) return data.id as string
-  }
-
-  const name = key.displayName || key.phone || key.email || key.telegram || key.whatsapp || 'Новый контакт'
-  const [firstName, ...rest] = String(name).split(' ')
-  const { data: created, error } = await supabase
+  const { data } = await supabase
     .from('contacts')
-    .insert({
-      first_name: firstName || 'Без имени',
-      last_name: rest.join(' ') || null,
-      phone: key.phone || null,
-      email: key.email || null,
-      telegram: key.telegram || null,
-      whatsapp: key.whatsapp || null,
-      source: 'chat',
-    })
     .select('id')
-    .single()
-  if (error) throw error
-  return created!.id as string
+    .or(filters.join(','))
+    .limit(1)
+    .maybeSingle()
+  return (data?.id as string) || null
 }
 
 export interface ThreadKey {
