@@ -51,18 +51,65 @@ async function readCreds(id: string): Promise<Record<string, any>> {
   return (data?.credentials as Record<string, any>) || {}
 }
 
+async function importMessage(gmail: any, it: Integration, id: string) {
+  const msg = await gmail.users.messages.get({ userId: 'me', id, format: 'full' })
+  const headers = msg.data.payload?.headers || []
+  const hget = (n: string) => headers.find((h: any) => (h.name || '').toLowerCase() === n.toLowerCase())?.value || ''
+  const from = hget('From')
+  const to = hget('To')
+  const cc = hget('Cc')
+  const subject = hget('Subject') || '(без темы)'
+  const date = hget('Date')
+  const { text, html } = extractBodies(msg.data.payload)
+  const emailMatch = from.match(/<(.+?)>/)?.[1] || from
+  const displayName = from.replace(/<.+?>/, '').trim().replace(/^"|"$/g, '') || from
+  const contactId = await resolveContact({ email: emailMatch, displayName })
+  const threadId = await upsertThread({
+    channel: it.kind,
+    integrationId: it.id,
+    externalThreadId: msg.data.threadId!,
+    contactId,
+    title: subject,
+  })
+  const plainBody = (text || stripHtml(html) || msg.data.snippet || '').trim()
+  await insertInbound({
+    threadId, integrationId: it.id,
+    externalMessageId: id,
+    senderName: displayName,
+    body: plainBody,
+    attachments: [{ kind: 'email_meta', from, to, cc, subject, date, html: html || null }],
+  })
+}
+
 export async function pollGmail(it: Integration) {
   try {
     const auth = await ensureTokens(it)
     const gmail = google.gmail({ version: 'v1', auth })
     const creds = await readCreds(it.id)
     const lastHistory = creds.last_history_id as string | undefined
+    const backfilled = !!creds.backfilled_at
 
-    if (!lastHistory) {
-      // Bootstrap: get current historyId.
+    if (!lastHistory || !backfilled) {
+      // Bootstrap + initial backfill of the most recent N messages from INBOX.
       const profile = await gmail.users.getProfile({ userId: 'me' })
+      const list = await gmail.users.messages.list({
+        userId: 'me', maxResults: 50, labelIds: ['INBOX'], q: 'newer_than:30d',
+      })
+      const ids = (list.data.messages || []).map((m: any) => m.id).filter(Boolean)
+      log.info({ id: it.id, count: ids.length }, 'gmail initial backfill')
+      for (const id of ids) {
+        try { await importMessage(gmail, it, id) }
+        catch (e: any) { log.warn({ err: e.message, msgId: id }, 'gmail backfill message failed') }
+      }
+      const fresh = await readCreds(it.id)
       await updateIntegration(it.id, {
-        credentials: { ...creds, last_history_id: String(profile.data.historyId) },
+        credentials: {
+          ...fresh,
+          last_history_id: String(profile.data.historyId),
+          backfilled_at: new Date().toISOString(),
+        },
+        last_error: null,
+        status: 'active',
       })
       return
     }
@@ -82,32 +129,8 @@ export async function pollGmail(it: Integration) {
     }
 
     for (const id of newIds) {
-      const msg = await gmail.users.messages.get({ userId: 'me', id, format: 'full' })
-      const headers = msg.data.payload?.headers || []
-      const hget = (n: string) => headers.find((h) => (h.name || '').toLowerCase() === n.toLowerCase())?.value || ''
-      const from = hget('From')
-      const to = hget('To')
-      const cc = hget('Cc')
-      const subject = hget('Subject') || '(без темы)'
-      const date = hget('Date')
-      const { text, html } = extractBodies(msg.data.payload)
-      const emailMatch = from.match(/<(.+?)>/)?.[1] || from
-      const displayName = from.replace(/<.+?>/, '').trim().replace(/^"|"$/g, '') || from
-      const contactId = await resolveContact({ email: emailMatch, displayName })
-      const threadId = await upsertThread({ channel: it.kind,
-        integrationId: it.id,
-        externalThreadId: msg.data.threadId!,
-        contactId,
-        title: subject,
-      })
-      const plainBody = (text || stripHtml(html) || msg.data.snippet || '').trim()
-      await insertInbound({
-        threadId, integrationId: it.id,
-        externalMessageId: id,
-        senderName: displayName,
-        body: plainBody,
-        attachments: [{ kind: 'email_meta', from, to, cc, subject, date, html: html || null }],
-      })
+      try { await importMessage(gmail, it, id) }
+      catch (e: any) { log.warn({ err: e.message, msgId: id }, 'gmail import failed') }
     }
 
     if (history?.data.historyId) {
