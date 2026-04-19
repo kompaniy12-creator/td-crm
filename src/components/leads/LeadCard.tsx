@@ -1,13 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Phone, MessageCircle, Clock, ArrowRight } from 'lucide-react'
+import { Phone, Clock, ArrowRight } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Avatar } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils/cn'
 import { formatRelative } from '@/lib/utils/format'
-import { promoteLeadToDeal } from '@/lib/api/promote'
+import { PromoteLeadModal } from './PromoteLeadModal'
 import type { Lead } from '@/types'
 
 interface LeadCardProps {
@@ -29,26 +28,16 @@ const sourceIcons: Record<string, string> = {
 }
 
 export function LeadCard({ lead, onClick }: LeadCardProps) {
-  const router = useRouter()
-  const [promoting, setPromoting] = useState(false)
+  const [promoteOpen, setPromoteOpen] = useState(false)
   const fullName = [lead.first_name, lead.last_name].filter(Boolean).join(' ')
 
-  async function promote(e: React.MouseEvent) {
+  function openPromote(e: React.MouseEvent) {
     e.stopPropagation()
-    setPromoting(true)
-    try {
-      const data = await promoteLeadToDeal(lead.id)
-      if (data.dealId) {
-        router.push(`/deals/detail/?id=${data.dealId}`)
-      } else {
-        alert(data.error || 'Не удалось создать сделку')
-      }
-    } finally {
-      setPromoting(false)
-    }
+    setPromoteOpen(true)
   }
 
   return (
+    <>
     <div
       onClick={onClick}
       className={cn(
@@ -111,15 +100,16 @@ export function LeadCard({ lead, onClick }: LeadCardProps) {
       {/* Promote-to-deal button: shown when lead is qualified enough to become a deal */}
       {(lead.status === 'won' || lead.status === 'qualified' || lead.status === 'proposal' || lead.status === 'negotiation') && (
         <button
-          onClick={promote}
-          disabled={promoting}
-          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-green-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+          onClick={openPromote}
+          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-green-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-green-700 transition-colors"
         >
           <ArrowRight className="h-3.5 w-3.5" />
-          {promoting ? 'Создаём сделку...' : 'Перевести в сделку'}
+          Перевести в сделку
         </button>
       )}
     </div>
+    <PromoteLeadModal open={promoteOpen} lead={lead} onClose={() => setPromoteOpen(false)} />
+    </>
   )
 }
 

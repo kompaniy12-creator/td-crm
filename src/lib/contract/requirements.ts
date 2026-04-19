@@ -44,6 +44,46 @@ function isEmpty(v: unknown): boolean {
   return false
 }
 
+// Flat shape used by the deal-creation / lead-promotion form.
+// Mirrors CONTRACT_REQUIRED_FIELDS one-to-one.
+export interface ContractFormState {
+  // contact
+  first_name: string
+  last_name: string
+  address: string
+  city: string
+  passport_series: string
+  passport_number: string
+  phone: string
+  email: string
+  // deal
+  amount: string // string because it's bound to an <input type="number">
+  // metadata
+  service_type: string
+  prepayment_amount: string
+  prepayment_date: string
+  second_payment: string
+  second_payment_date: string
+}
+
+export interface ValidateResult {
+  ok: boolean
+  missing: { key: string; label: string }[]
+}
+
+export function validateContractFields(
+  state: Partial<ContractFormState>
+): ValidateResult {
+  const missing: { key: string; label: string }[] = []
+  for (const field of CONTRACT_REQUIRED_FIELDS) {
+    if (!field.required) continue
+    const flatKey = field.key.split('.')[1] as keyof ContractFormState
+    const value = state[flatKey]
+    if (isEmpty(value)) missing.push({ key: field.key, label: field.label })
+  }
+  return { ok: missing.length === 0, missing }
+}
+
 export function checkContractReadiness(
   deal: Partial<Deal> | null | undefined,
   contact: Partial<Contact> | null | undefined

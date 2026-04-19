@@ -3,12 +3,12 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  X, Phone, Mail, ChevronDown, ArrowRight, AlertCircle,
+  X, Phone, Mail, ChevronDown, ArrowRight,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Lead, Contact, Activity, LeadStatus, ServiceType, LeadSource } from '@/types'
 import { SOURCE_LABELS } from '@/types'
-import { promoteLeadToDeal } from '@/lib/api/promote'
+import { PromoteLeadModal } from './PromoteLeadModal'
 import { EditableField } from '@/components/common/EditableField'
 import { Avatar } from '@/components/ui/avatar'
 
@@ -110,8 +110,7 @@ export function LeadDetail({ lead, contact }: Props) {
   const [activeTab, setActiveTab] = useState<'general' | 'history'>('general')
   const [statusOpen, setStatusOpen] = useState(false)
   const [activities, setActivities] = useState<Activity[]>([])
-  const [promoting, setPromoting] = useState(false)
-  const [promoteError, setPromoteError] = useState<string | null>(null)
+  const [promoteOpen, setPromoteOpen] = useState(false)
 
   const fullName = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || 'Без имени'
 
@@ -134,21 +133,6 @@ export function LeadDetail({ lead, contact }: Props) {
     const supabase = createClient()
     await supabase.from('leads').update({ status }).eq('id', lead.id)
     router.refresh()
-  }
-
-  async function promote() {
-    setPromoteError(null)
-    setPromoting(true)
-    try {
-      const data = await promoteLeadToDeal(lead.id)
-      if (data.dealId) {
-        router.push(`/deals/detail/?id=${data.dealId}`)
-      } else {
-        setPromoteError(data.error || 'Не удалось создать сделку')
-      }
-    } finally {
-      setPromoting(false)
-    }
   }
 
   const showPromote = ['qualified', 'proposal', 'negotiation', 'won'].includes(lead.status)
@@ -223,22 +207,17 @@ export function LeadDetail({ lead, contact }: Props) {
             </div>
             <div className="flex-1" />
             <button
-              onClick={promote}
-              disabled={promoting}
-              className="flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+              onClick={() => setPromoteOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-green-700 transition-colors"
             >
               <ArrowRight className="h-3.5 w-3.5" />
-              {promoting ? 'Создаём сделку...' : 'ПЕРЕВЕСТИ В СДЕЛКУ'}
+              ПЕРЕВЕСТИ В СДЕЛКУ
             </button>
           </div>
-          {promoteError && (
-            <div className="mt-2 flex items-start gap-1.5 rounded bg-red-100 border border-red-300 px-3 py-1.5 text-xs text-red-800">
-              <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
-              {promoteError}
-            </div>
-          )}
         </div>
       )}
+
+      <PromoteLeadModal open={promoteOpen} lead={lead} onClose={() => setPromoteOpen(false)} />
 
       {/* MAIN CONTENT */}
       <div className="flex flex-1 overflow-hidden">
