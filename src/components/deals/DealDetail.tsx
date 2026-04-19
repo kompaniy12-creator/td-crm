@@ -20,6 +20,7 @@ import { DealReminders } from './DealReminders'
 import { DealAttachments } from './DealAttachments'
 import { DealTasks } from './DealTasks'
 import { CreateTaskModal } from '@/components/tasks/CreateTaskModal'
+import { sendToContact, type SendChannel } from '@/lib/chats/sendToContact'
 import { DealContract } from './DealContract'
 import { ClientJourney } from './ClientJourney'
 
@@ -158,6 +159,8 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
   const [isSaving, setIsSaving] = useState(false)
   const [showCreateTask, setShowCreateTask] = useState(false)
   const [tasksReloadToken, setTasksReloadToken] = useState(0)
+  const [sendingVia, setSendingVia] = useState<SendChannel | null>(null)
+  const [sendFlash, setSendFlash] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
 
   const meta = (deal.metadata || {}) as Record<string, string>
 
@@ -213,6 +216,46 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
     setComment('')
     setIsSaving(false)
     router.refresh()
+  }
+
+  async function sendViaCrm(channel: SendChannel) {
+    if (!contact || !currentUser) return
+    const text = comment.trim()
+    if (!text) {
+      // No text → fall back to opening the external app
+      openChannel(channel)
+      return
+    }
+    setSendingVia(channel); setSendFlash(null)
+    const res = await sendToContact(
+      contact,
+      channel,
+      text,
+      {
+        dealId: deal.id,
+        senderUserId: currentUser.id,
+        senderName: currentUser.fullName ?? currentUser.email ?? 'Оператор',
+      },
+    )
+    setSendingVia(null)
+    if (!res.ok) {
+      setSendFlash({ kind: 'err', text: res.reason || 'Не удалось отправить' })
+      return
+    }
+    // Log into deal history + clear input
+    const supabase = createClient()
+    await supabase.from('activities').insert({
+      type: 'message',
+      description: `${channel === 'whatsapp' ? 'WhatsApp' : 'Telegram'}: ${text}`,
+      deal_id: deal.id,
+      contact_id: contact.id,
+      user_id: currentUser.id,
+      metadata: { channel, outbound: true, thread_id: res.threadId },
+    })
+    setComment('')
+    setSendFlash({ kind: 'ok', text: `Отправлено в ${channel === 'whatsapp' ? 'WhatsApp' : 'Telegram'}` })
+    router.refresh()
+    setTimeout(() => setSendFlash(null), 3500)
   }
 
   function openChannel(channel: 'whatsapp' | 'telegram' | 'phone' | 'email') {
@@ -721,25 +764,40 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
 
                 {/* Quick channels for message */}
                 {activityTab === 'message' && contact && (
-                  <div className="mb-2 flex flex-wrap items-center gap-1.5">
-                    <span className="text-[11px] text-gray-500 mr-1">Открыть:</span>
-                    <button
-                      onClick={() => openChannel('whatsapp')}
-                      className="rounded-full border border-green-300 bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700 hover:bg-green-100"
-                    >WhatsApp</button>
-                    <button
-                      onClick={() => openChannel('telegram')}
-                      className="rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700 hover:bg-sky-100"
-                    >Telegram</button>
-                    <button
-                      onClick={() => openChannel('phone')}
-                      className="rounded-full border border-gray-300 bg-gray-50 px-2 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-100"
-                    >Позвонить</button>
-                    <button
-                      onClick={() => openChannel('email')}
-                      className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 hover:bg-amber-100"
-                    >Email</button>
-                  </div>
+                  <>
+                    <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] text-gray-500 mr-1">
+                        {comment.trim() ? 'Отправить:' : 'Открыть:'}
+                      </span>
+                      <button
+                        onClick={() => sendViaCrm('whatsapp')}
+                        disabled={sendingVia !== null}
+                        className="rounded-full border border-green-300 bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700 hover:bg-green-100 disabled:opacity-50"
+                      >{sendingVia === 'whatsapp' ? 'Отправка…' : 'WhatsApp'}</button>
+                      <button
+                        onClick={() => sendViaCrm('telegram')}
+                        disabled={sendingVia !== null}
+                        className="rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700 hover:bg-sky-100 disabled:opacity-50"
+                      >{sendingVia === 'telegram' ? 'Отправка…' : 'Telegram'}</button>
+                      <button
+                        onClick={() => openChannel('phone')}
+                        className="rounded-full border border-gray-300 bg-gray-50 px-2 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-100"
+                      >Позвонить</button>
+                      <button
+                        onClick={() => openChannel('email')}
+                        className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 hover:bg-amber-100"
+                      >Email</button>
+                    </div>
+                    {sendFlash && (
+                      <div
+                        className={`mb-2 rounded-md px-2 py-1 text-[11px] ${
+                          sendFlash.kind === 'ok'
+                            ? 'bg-green-50 text-green-700 border border-green-200'
+                            : 'bg-red-50 text-red-700 border border-red-200'
+                        }`}
+                      >{sendFlash.text}</div>
+                    )}
+                  </>
                 )}
 
                 {/* Meeting datetime */}
@@ -763,7 +821,7 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
                     placeholder={
                       activityTab === 'comment' ? 'Комментарий для команды'
                       : activityTab === 'task' ? 'Что нужно сделать'
-                      : activityTab === 'message' ? 'Что сказать клиенту (записывается в историю)'
+                      : activityTab === 'message' ? 'Напишите клиенту — нажмите WhatsApp или Telegram для отправки'
                       : 'Тема встречи'
                     }
                     rows={2}
