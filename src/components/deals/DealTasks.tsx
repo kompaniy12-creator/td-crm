@@ -22,6 +22,7 @@ interface Task {
 interface Props {
   dealId: string
   contactId: string | null
+  reloadToken?: number
 }
 
 const PRIORITY_LABELS: Record<Task['priority'], string> = {
@@ -37,7 +38,7 @@ const PRIORITY_COLORS: Record<Task['priority'], string> = {
   urgent: 'text-red-600 bg-red-50',
 }
 
-export function DealTasks({ dealId, contactId }: Props) {
+export function DealTasks({ dealId, contactId, reloadToken = 0 }: Props) {
   const { user } = useCurrentUser()
   const [items, setItems] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
@@ -56,7 +57,7 @@ export function DealTasks({ dealId, contactId }: Props) {
     setLoading(false)
   }, [dealId])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load() }, [load, reloadToken])
 
   async function toggleDone(task: Task, e: React.MouseEvent) {
     e.stopPropagation()

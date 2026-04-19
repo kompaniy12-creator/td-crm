@@ -157,6 +157,7 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
   const [meetingAt, setMeetingAt] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [showCreateTask, setShowCreateTask] = useState(false)
+  const [tasksReloadToken, setTasksReloadToken] = useState(0)
 
   const meta = (deal.metadata || {}) as Record<string, string>
 
@@ -589,7 +590,7 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
           />
 
           {/* ЗАДАЧИ */}
-          <DealTasks dealId={deal.id} contactId={contact?.id ?? null} />
+          <DealTasks dealId={deal.id} contactId={contact?.id ?? null} reloadToken={tasksReloadToken} />
 
           {/* НАПОМИНАНИЯ */}
           <DealReminders dealId={deal.id} contactId={contact?.id ?? null} />
@@ -817,7 +818,7 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
         onClose={() => setShowCreateTask(false)}
         defaultDealId={deal.id}
         defaultContactId={contact?.id ?? null}
-        onCreated={() => router.refresh()}
+        onCreated={() => { setTasksReloadToken((n) => n + 1); router.refresh() }}
       />
     </div>
   )
