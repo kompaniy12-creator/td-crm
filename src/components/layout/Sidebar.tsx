@@ -38,8 +38,8 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'relative flex h-screen flex-col border-r border-white/20 bg-white/20 backdrop-blur-xl shadow-sm transition-all duration-300',
-        'group-data-[theme=dark]/theme:bg-slate-900/25 group-data-[theme=dark]/theme:border-white/10',
+        'relative flex h-screen flex-col border-r border-white/15 bg-white/10 backdrop-blur-xl shadow-sm transition-all duration-300',
+        'group-data-[theme=dark]/theme:bg-slate-900/15 group-data-[theme=dark]/theme:border-white/10',
         sidebarCollapsed ? 'w-16' : 'w-60'
       )}
     >
@@ -68,7 +68,7 @@ export function Sidebar() {
           onClick={toggleSidebar}
           className={cn(
             'flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm hover:bg-gray-50 hover:text-blue-600 transition-colors',
-            'group-data-[theme=dark]/theme:border-white/10 group-data-[theme=dark]/theme:bg-white/10 group-data-[theme=dark]/theme:text-gray-200 group-data-[theme=dark]/theme:hover:bg-white/20',
+            'group-data-[theme=dark]/theme:border-white/10 group-data-[theme=dark]/theme:bg-white/10 group-data-[theme=dark]/theme:text-gray-200 group-data-[theme=dark]/theme:hover:bg-white/10',
             sidebarCollapsed && 'absolute -right-3 top-[60px] z-10'
           )}
           aria-label="Свернуть"
