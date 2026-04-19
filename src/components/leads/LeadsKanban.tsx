@@ -33,10 +33,10 @@ export function LeadsKanban({ leads, onLeadClick }: LeadsKanbanProps) {
         return (
           <div
             key={col.status}
-            className="flex w-72 flex-shrink-0 flex-col rounded-xl bg-gray-50 border border-gray-200"
+            className="flex w-72 flex-shrink-0 flex-col rounded-xl bg-white/60 backdrop-blur-md border border-white/50 shadow-sm"
           >
             {/* Column header */}
-            <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-200">
+            <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-200/60">
               <div className="flex items-center gap-2">
                 <h3 className={cn('text-sm font-semibold', col.color)}>{col.label}</h3>
                 <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', col.bgColor, col.color)}>

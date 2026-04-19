@@ -69,7 +69,7 @@ export function DealCard({ deal, onClick }: DealCardProps) {
   return (
     <div
       onClick={handleClick}
-      className="cursor-pointer rounded-lg bg-white border border-gray-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-150 relative"
+      className="cursor-pointer rounded-xl bg-white border border-gray-200/80 shadow-sm hover:shadow-md hover:border-blue-300 hover:-translate-y-0.5 transition-all duration-150 relative"
     >
       {/* Main content */}
       <div className="px-3 pt-3 pb-2">

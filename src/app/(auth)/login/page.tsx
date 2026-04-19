@@ -51,7 +51,16 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
+    <div
+      className="flex min-h-screen items-center justify-center px-4"
+      style={{
+        backgroundImage:
+          'url(https://images.unsplash.com/photo-1601297183305-6df142704ea2?auto=format&fit=crop&w=2000&q=80)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed',
+      }}
+    >
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="mb-8 text-center">
@@ -63,7 +72,7 @@ export default function LoginPage() {
         </div>
 
         {/* Card */}
-        <div className="rounded-2xl bg-white p-8 shadow-xl">
+        <div className="rounded-2xl bg-white/80 backdrop-blur-xl border border-white/60 p-8 shadow-2xl">
           <h2 className="mb-6 text-xl font-semibold text-gray-900">Войти в систему</h2>
 
           <form onSubmit={handleLogin} className="space-y-4">

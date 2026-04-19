@@ -52,8 +52,8 @@ export function LeadCard({ lead, onClick }: LeadCardProps) {
     <div
       onClick={onClick}
       className={cn(
-        'group cursor-pointer rounded-lg border border-gray-200 bg-white p-3.5 shadow-sm',
-        'hover:border-blue-300 hover:shadow-md transition-all duration-150'
+        'group cursor-pointer rounded-xl border border-gray-200/80 bg-white p-3.5 shadow-sm',
+        'hover:border-blue-300 hover:shadow-md hover:-translate-y-0.5 transition-all duration-150'
       )}
     >
       {/* Header */}

@@ -66,7 +66,7 @@ export default function DealsPage() {
   return (
     <div className="flex h-full flex-col">
       {/* ── TOOLBAR ── */}
-      <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-6 py-3">
+      <div className="flex items-center gap-3 border-b border-white/40 bg-white/70 backdrop-blur-xl px-6 py-3 shadow-sm">
 
         {/* Pipeline dropdown */}
         <div className="relative" ref={dropdownRef}>

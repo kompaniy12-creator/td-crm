@@ -63,7 +63,7 @@ export default function ContactsPage() {
   return (
     <div className="flex h-full flex-col">
       {/* ── TOOLBAR ── */}
-      <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-6 py-3">
+      <div className="flex items-center gap-3 border-b border-white/40 bg-white/70 backdrop-blur-xl px-6 py-3 shadow-sm">
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />

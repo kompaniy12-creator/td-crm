@@ -65,13 +65,13 @@ export function DealsKanban({ deals, pipeline, onDealClick, onAddDeal }: DealsKa
         return (
           <div
             key={stage}
-            className="flex w-[270px] flex-shrink-0 flex-col rounded-xl bg-gray-50 border border-gray-200 overflow-hidden"
+            className="flex w-[270px] flex-shrink-0 flex-col rounded-xl bg-white/60 backdrop-blur-md border border-white/50 shadow-sm overflow-hidden"
           >
             {/* Colored top bar */}
             <div className={`h-1.5 w-full ${colorClass}`} />
 
             {/* Column header */}
-            <div className="px-3 py-2.5 bg-white border-b border-gray-200">
+            <div className="px-3 py-2.5 bg-white/80 backdrop-blur border-b border-gray-200/60">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-xs font-semibold text-gray-700 leading-tight line-clamp-2 flex-1">
                   {stage}
@@ -88,7 +88,7 @@ export function DealsKanban({ deals, pipeline, onDealClick, onAddDeal }: DealsKa
             {/* Add deal button */}
             <button
               onClick={() => onAddDeal?.(stage)}
-              className="flex w-full items-center justify-center gap-1.5 border-b border-gray-200 bg-white py-1.5 text-xs text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+              className="flex w-full items-center justify-center gap-1.5 border-b border-gray-200/60 bg-white/60 py-1.5 text-xs text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
             >
               <Plus className="h-3.5 w-3.5" />
               {isFirst ? 'Быстрая сделка' : 'Добавить сделку'}

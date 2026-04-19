@@ -45,7 +45,7 @@ export default function LeadsPage() {
   return (
     <div className="flex h-full flex-col">
       {/* Stats bar */}
-      <div className="flex items-center gap-6 border-b border-gray-200 bg-white px-6 py-3">
+      <div className="flex items-center gap-6 border-b border-white/40 bg-white/70 backdrop-blur-xl px-6 py-3 shadow-sm">
         <Stat label="Всего" value={stats.total} />
         <Stat label="Новые" value={stats.new} color="text-blue-600" />
         <Stat label="Контакт" value={stats.contacted} color="text-indigo-600" />

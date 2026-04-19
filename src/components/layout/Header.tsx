@@ -40,36 +40,36 @@ export function Header() {
   }
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-6">
+    <header className="flex h-14 items-center justify-between border-b border-white/40 bg-white/70 backdrop-blur-xl px-6 shadow-sm">
       <div className="flex items-center gap-4">
-        <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
+        <h1 className="text-[15px] font-semibold text-gray-900">{title}</h1>
       </div>
 
       <div className="flex items-center gap-3">
         {/* Search */}
         <div className="relative hidden md:block">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             placeholder="Поиск..."
-            className="h-9 w-64 rounded-md border border-gray-300 bg-gray-50 pl-9 pr-4 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="h-9 w-72 rounded-full border border-gray-200/80 bg-white/80 backdrop-blur pl-10 pr-4 text-[13px] text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
           />
         </div>
 
         {/* Create button */}
-        <Button size="sm" onClick={handleCreate} className="gap-2">
+        <Button size="sm" onClick={handleCreate} className="gap-2 rounded-full">
           <Plus className="h-4 w-4" />
           {createLabel()}
         </Button>
 
         {/* Notifications */}
-        <button className="relative flex h-9 w-9 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100">
-          <Bell className="h-5 w-5" />
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500" />
+        <button className="relative flex h-9 w-9 items-center justify-center rounded-full text-gray-500 hover:bg-white/80 transition-colors">
+          <Bell className="h-[18px] w-[18px]" />
+          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
         </button>
 
         {/* User avatar */}
-        <Avatar name="Sergiy K" size="sm" className="cursor-pointer" />
+        <Avatar name="Sergiy K" size="sm" className="cursor-pointer ring-2 ring-white/80" />
       </div>
     </header>
   )

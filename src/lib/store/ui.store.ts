@@ -25,6 +25,11 @@ interface UIState {
   setCreateDealOpen: (open: boolean) => void
   setCreateContactOpen: (open: boolean) => void
   setCreateTaskOpen: (open: boolean) => void
+  // Background — preset id ('none', 'clouds', ...) or 'custom'
+  backgroundId: string
+  customBackgroundUrl: string | null
+  setBackgroundId: (id: string) => void
+  setCustomBackgroundUrl: (url: string | null) => void
 }
 
 export const useUIStore = create<UIState>()(
@@ -52,6 +57,11 @@ export const useUIStore = create<UIState>()(
       setCreateDealOpen: (open) => set({ createDealOpen: open }),
       setCreateContactOpen: (open) => set({ createContactOpen: open }),
       setCreateTaskOpen: (open) => set({ createTaskOpen: open }),
+
+      backgroundId: 'clouds',
+      customBackgroundUrl: null,
+      setBackgroundId: (id) => set({ backgroundId: id }),
+      setCustomBackgroundUrl: (url) => set({ customBackgroundUrl: url }),
     }),
     {
       name: 'td-crm-ui',
@@ -61,6 +71,8 @@ export const useUIStore = create<UIState>()(
         dealsView: state.dealsView,
         contactsView: state.contactsView,
         activePipeline: state.activePipeline,
+        backgroundId: state.backgroundId,
+        customBackgroundUrl: state.customBackgroundUrl,
       }),
     }
   )
