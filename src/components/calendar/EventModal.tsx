@@ -3,13 +3,25 @@
 import { useEffect, useState } from 'react'
 import { X, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { CalendarEvent } from '@/lib/calendar/types'
+import type { CalendarEvent, CalendarMeta } from '@/lib/calendar/types'
 
 interface Props {
   event: CalendarEvent | null
   defaultDate: Date | null
   userId: string | null
+  calendars?: CalendarMeta[]
   onClose: () => void
+}
+
+function htmlToText(s: string | null | undefined): string {
+  if (!s) return ''
+  // Google returns rich HTML in descriptions; render to plain text for editing.
+  if (typeof window === 'undefined') return s
+  const div = document.createElement('div')
+  div.innerHTML = s
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|h[1-6]|li)>/gi, '\n')
+  return (div.textContent || div.innerText || '').replace(/\n{3,}/g, '\n\n').trim()
 }
 
 function toLocalInput(iso: string) {
@@ -24,14 +36,17 @@ function fromLocalInput(v: string): string {
   return new Date(v).toISOString()
 }
 
-export function EventModal({ event, defaultDate, userId, onClose }: Props) {
+export function EventModal({ event, defaultDate, userId, calendars, onClose }: Props) {
+  const calendar = event?.google_calendar_id
+    ? calendars?.find((c) => c.id === event.google_calendar_id)
+    : undefined
   const isEdit = !!event
   const base = defaultDate || new Date()
   const defStart = new Date(base); defStart.setHours(10, 0, 0, 0)
   const defEnd = new Date(base); defEnd.setHours(11, 0, 0, 0)
 
   const [title, setTitle] = useState(event?.title || '')
-  const [description, setDescription] = useState(event?.description || '')
+  const [description, setDescription] = useState(htmlToText(event?.description))
   const [location, setLocation] = useState(event?.location || '')
   const [allDay, setAllDay] = useState(event?.all_day || false)
   const [starts, setStarts] = useState(toLocalInput(event?.starts_at || defStart.toISOString()))
@@ -160,10 +175,20 @@ export function EventModal({ event, defaultDate, userId, onClose }: Props) {
           <div>
             <label className="mb-1 block text-[11px] font-medium uppercase text-gray-500">Описание</label>
             <textarea
-              value={description} onChange={(e) => setDescription(e.target.value)} rows={3}
+              value={description} onChange={(e) => setDescription(e.target.value)} rows={5}
               className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
             />
           </div>
+
+          {calendar && (
+            <div className="flex items-center gap-2 text-[11px] text-gray-500">
+              <span
+                className="h-3 w-3 rounded-sm"
+                style={{ backgroundColor: calendar.backgroundColor || '#93c5fd' }}
+              />
+              <span className="truncate">{calendar.summary}</span>
+            </div>
+          )}
 
           {isEdit && event && (
             <div className="text-[11px] text-gray-400">

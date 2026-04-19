@@ -31,3 +31,14 @@ export interface CalendarEventInput {
   contact_id?: string | null
   deal_id?: string | null
 }
+
+export interface CalendarMeta {
+  id: string
+  summary: string
+  primary?: boolean
+  backgroundColor?: string
+  foregroundColor?: string
+  accessRole?: string
+}
+
+export type CalendarView = 'day' | 'week' | 'month'
