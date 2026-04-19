@@ -63,6 +63,7 @@ export interface DealFormPrefill {
 export interface DealSubmitPayload {
   contactId: string
   dealId: string
+  dealNumber?: number
 }
 
 export interface DealCreateFormProps {
@@ -306,12 +307,16 @@ export function DealCreateForm({
           contact_id: contactId,
           metadata,
         })
-        .select('id')
+        .select('id, number')
         .single()
 
       if (dErr || !dealRow) throw dErr || new Error('Не удалось создать сделку')
 
-      const payload: DealSubmitPayload = { contactId, dealId: dealRow.id as string }
+      const payload: DealSubmitPayload = {
+        contactId,
+        dealId: dealRow.id as string,
+        dealNumber: (dealRow as { number?: number }).number,
+      }
 
       if (postSubmit) await postSubmit(payload)
 

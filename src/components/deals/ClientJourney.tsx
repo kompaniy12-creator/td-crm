@@ -72,7 +72,7 @@ export function ClientJourney({ contactId, currentDealId }: { contactId: string;
           </div>
 
           {item.kind === 'lead' && <LeadCard lead={item.data} />}
-          {item.kind === 'deal' && <DealRow deal={item.data} current={item.data.id === currentDealId} onClick={() => router.push(`/deals/detail/?id=${item.data.id}`)} />}
+          {item.kind === 'deal' && <DealRow deal={item.data} current={item.data.id === currentDealId} onClick={() => router.push(`/deals/detail/?id=${item.data.number ?? item.data.id}`)} />}
           {item.kind === 'activity' && <ActivityRow activity={item.data} />}
 
           <div className="mt-1 text-[11px] text-gray-400">{formatDate(item.date)}</div>

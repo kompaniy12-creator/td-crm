@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { LeadDetail } from '@/components/leads/LeadDetail'
+import { lookupColumn, lookupValue } from '@/lib/utils/lookup'
 import type { Lead, Contact } from '@/types'
 
 function LeadDetailInner() {
@@ -26,7 +27,7 @@ function LeadDetailInner() {
       const { data: l } = await supabase
         .from('leads')
         .select('*')
-        .eq('id', id)
+        .eq(lookupColumn(id), lookupValue(id))
         .single()
       if (cancelled) return
       if (!l) {

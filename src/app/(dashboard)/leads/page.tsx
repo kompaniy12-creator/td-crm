@@ -14,7 +14,7 @@ import type { Lead } from '@/types'
 export default function LeadsPage() {
   const router = useRouter()
   const { leadsView, setLeadsView, createLeadOpen, setCreateLeadOpen } = useUIStore()
-  const openLead = (lead: Lead) => router.push(`/leads/detail/?id=${lead.id}`)
+  const openLead = (lead: Lead) => router.push(`/leads/detail/?id=${lead.number ?? lead.id}`)
   const [leads, setLeads] = useState<Lead[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedSource, setSelectedSource] = useState<string>('all')

@@ -86,9 +86,9 @@ export function PromoteLeadModal({ open, lead, onClose }: Props) {
                 user_id: '00000000-0000-0000-0000-000000000000',
               })
             }}
-            onSubmitted={({ dealId }) => {
+            onSubmitted={({ dealId, dealNumber }) => {
               onClose()
-              router.push(`/deals/detail/?id=${dealId}`)
+              router.push(`/deals/detail/?id=${dealNumber ?? dealId}`)
             }}
             submitLabel="Создать сделку"
             submitAndOpenLabel="Создать и открыть"

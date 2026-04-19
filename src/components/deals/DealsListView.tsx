@@ -64,7 +64,7 @@ export function DealsListView({ deals, pipeline }: DealsListViewProps) {
           {deals.map((deal) => (
             <tr
               key={deal.id}
-              onClick={() => router.push(`/deals/detail/?id=${deal.id}`)}
+              onClick={() => router.push(`/deals/detail/?id=${deal.number ?? deal.id}`)}
               className="hover:bg-blue-50 cursor-pointer transition-colors"
             >
               {/* Title */}

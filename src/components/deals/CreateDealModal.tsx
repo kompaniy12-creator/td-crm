@@ -35,10 +35,10 @@ export function CreateDealModal({
             defaultPipeline={defaultPipeline}
             defaultStage={defaultStage}
             onCancel={onClose}
-            onSubmitted={({ dealId }, openAfter) => {
+            onSubmitted={({ dealId, dealNumber }, openAfter) => {
               onCreated()
               onClose()
-              if (openAfter) router.push(`/deals/detail/?id=${dealId}`)
+              if (openAfter) router.push(`/deals/detail/?id=${dealNumber ?? dealId}`)
             }}
           />
         )}

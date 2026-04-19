@@ -18,6 +18,7 @@ export async function promoteDealToClient(
   dealId: string
 ): Promise<{
   clientDealId?: string
+  clientDealNumber?: number
   error?: string
   missing?: { key: string; label: string }[]
   needsFlag?: string
@@ -92,7 +93,7 @@ export async function promoteDealToClient(
       assigned_to: deal.assigned_to,
       metadata: { ...(deal.metadata || {}), promoted_from_deal_id: dealId },
     })
-    .select('id')
+    .select('id, number')
     .single()
 
   if (cdErr || !clientDeal) {
@@ -129,5 +130,8 @@ export async function promoteDealToClient(
     },
   ])
 
-  return { clientDealId: clientDeal.id }
+  return {
+    clientDealId: clientDeal.id as string,
+    clientDealNumber: (clientDeal as { number?: number }).number,
+  }
 }

@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { checkContractReadiness } from '@/lib/contract/requirements'
+import { lookupColumn, lookupValue } from '@/lib/utils/lookup'
 import type { Deal, Contact } from '@/types'
 
 function pad(n: number) {
@@ -36,11 +37,12 @@ function renderMissingFieldsHtml(dealId: string, missing: { label: string }[]) {
 </div></div>`
 }
 
-function buildContractHtml(id: string, deal: Deal, contact: Contact | null) {
+function buildContractHtml(deal: Deal, contact: Contact | null) {
   const meta = (deal.metadata || {}) as Record<string, string>
   const today = new Date()
   const dateStr = fmtDate(today)
-  const contractNo = String(id)
+  // Prefer the short user-facing number for the contract heading.
+  const contractNo = deal.number ? String(deal.number) : String(deal.id)
 
   const clientName = contact
     ? [contact.first_name, contact.last_name].filter(Boolean).join(' ')
@@ -311,12 +313,13 @@ function ContractInner() {
       const { data: deal } = await supabase
         .from('deals')
         .select('*')
-        .eq('id', id)
+        .eq(lookupColumn(id), lookupValue(id))
         .single()
       if (!deal) {
         setState({ status: 'notFound' })
         return
       }
+      const dealUuid = deal.id as string
       let contact: Contact | null = null
       if (deal.contact_id) {
         const { data } = await supabase
@@ -327,15 +330,16 @@ function ContractInner() {
         contact = data as Contact | null
       }
       const { missing, isReady } = checkContractReadiness(deal as Deal, contact)
+      const displayNo = (deal as Deal).number ?? dealUuid
       if (!isReady) {
         setState({
           status: 'missing',
-          html: renderMissingFieldsHtml(id, missing),
+          html: renderMissingFieldsHtml(String(displayNo), missing),
         })
         return
       }
-      const html = buildContractHtml(id, deal as Deal, contact)
-      setState({ status: 'ready', html, title: `Umowa ${id}` })
+      const html = buildContractHtml(deal as Deal, contact)
+      setState({ status: 'ready', html, title: `Umowa ${displayNo}` })
     })()
   }, [id])
 

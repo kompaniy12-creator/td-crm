@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { DealDetail } from '@/components/deals/DealDetail'
+import { lookupColumn, lookupValue } from '@/lib/utils/lookup'
 import type { Deal, Contact, Activity, Comment } from '@/types'
 
 function DealDetailInner() {
@@ -28,7 +29,7 @@ function DealDetailInner() {
       const { data: d } = await supabase
         .from('deals')
         .select('*')
-        .eq('id', id)
+        .eq(lookupColumn(id), lookupValue(id))
         .single()
       if (cancelled) return
       if (!d) {
@@ -36,6 +37,7 @@ function DealDetailInner() {
         setLoading(false)
         return
       }
+      const dealUuid = d.id as string
       let c: Contact | null = null
       if (d.contact_id) {
         const { data } = await supabase
@@ -48,12 +50,12 @@ function DealDetailInner() {
       const { data: acts } = await supabase
         .from('activities')
         .select('*')
-        .eq('deal_id', id)
+        .eq('deal_id', dealUuid)
         .order('created_at', { ascending: false })
       const { data: cmts } = await supabase
         .from('comments')
         .select('*')
-        .eq('deal_id', id)
+        .eq('deal_id', dealUuid)
         .order('created_at', { ascending: false })
 
       if (cancelled) return

@@ -201,7 +201,7 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
         return
       }
       // Redirect to the new client deal
-      router.push(`/deals/detail/?id=${data.clientDealId}`)
+      router.push(`/deals/detail/?id=${data.clientDealNumber ?? data.clientDealId}`)
     } finally {
       setPromoting(false)
     }
@@ -250,7 +250,7 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
           <button
             onClick={() => {
               const base = process.env.NODE_ENV === 'production' ? '/td-crm' : ''
-              window.open(`${base}/deals/contract/?id=${deal.id}`, '_blank')
+              window.open(`${base}/deals/contract/?id=${deal.number ?? deal.id}`, '_blank')
             }}
             title={contractReady
               ? 'Сгенерировать договор'
