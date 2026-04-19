@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Plus, RefreshCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
@@ -344,7 +344,7 @@ function MonthView({
 }
 
 // ============== Day / Week time-grid ==============
-const HOUR_PX = 48 // pixels per hour
+const HOUR_PX = 64 // pixels per hour, like Google week view
 
 function TimeGridView({
   days, start, events, styleFor, onCreate, onEdit,
@@ -419,7 +419,7 @@ function TimeGridView({
       </div>
 
       {/* Scrolling hours grid */}
-      <div className="min-h-0 flex-1 overflow-auto">
+      <TimeGridScroller days={days}>
         <div className="relative grid"
           style={{ gridTemplateColumns: `56px repeat(${days}, 1fr)`, height: `${24 * HOUR_PX}px` }}>
           {/* Hour labels column */}
@@ -444,7 +444,21 @@ function TimeGridView({
             />
           ))}
         </div>
-      </div>
+      </TimeGridScroller>
+    </div>
+  )
+}
+
+function TimeGridScroller({ children }: { days: number; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!ref.current) return
+    // Scroll to roughly 07:00 so working hours are visible on mount.
+    ref.current.scrollTop = 7 * HOUR_PX
+  }, [])
+  return (
+    <div ref={ref} className="min-h-0 flex-1 overflow-auto">
+      {children}
     </div>
   )
 }
@@ -492,23 +506,39 @@ function DayTimeColumn({
       {/* Events */}
       {laid.map(({ ev, topMin, heightMin, left, width }) => {
         const s = styleFor(ev)
+        const heightPx = Math.max((heightMin / 60) * HOUR_PX - 2, 20)
+        const showTime = heightMin >= 25
+        const twoLineTitle = heightMin >= 60
         return (
           <button
             key={ev.id}
             onClick={(e) => { e.stopPropagation(); onEdit(ev) }}
-            className="absolute overflow-hidden rounded px-1.5 py-0.5 text-left text-[11px] shadow-sm hover:brightness-95"
+            className="absolute flex flex-col overflow-hidden rounded-md px-2 py-1 text-left shadow-sm hover:brightness-95"
             style={{
               top: `${(topMin / 60) * HOUR_PX}px`,
-              height: `${Math.max((heightMin / 60) * HOUR_PX - 2, 18)}px`,
+              height: `${heightPx}px`,
               left: `calc(${left * 100}% + 2px)`,
               width: `calc(${width * 100}% - 4px)`,
+              fontSize: '12px',
+              lineHeight: '1.15',
               ...s,
             }}
-            title={`${ev.title}\n${fmtTime(new Date(ev.starts_at))} – ${fmtTime(new Date(ev.ends_at))}${ev.location ? `\n${ev.location}` : ''}`}
+            title={`${ev.title}\n${fmtTime(new Date(ev.starts_at))} – ${fmtTime(new Date(ev.ends_at))}${ev.location ? `\n${ev.location}` : ''}${ev.description ? `\n\n${ev.description.replace(/<[^>]+>/g, ' ').slice(0, 200)}` : ''}`}
           >
-            <div className="truncate font-medium">{ev.title || '(без названия)'}</div>
-            {heightMin >= 30 && (
-              <div className="truncate text-[10px] opacity-80">
+            <div
+              className="font-medium"
+              style={{
+                display: '-webkit-box',
+                WebkitLineClamp: twoLineTitle ? 2 : 1,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                wordBreak: 'break-word',
+              }}
+            >
+              {ev.title || '(без названия)'}
+            </div>
+            {showTime && (
+              <div className="truncate text-[11px] opacity-85">
                 {fmtTime(new Date(ev.starts_at))}–{fmtTime(new Date(ev.ends_at))}
                 {ev.location ? ` · ${ev.location}` : ''}
               </div>
@@ -530,7 +560,6 @@ interface LaidEvent {
 
 function layoutEvents(evts: CalendarEvent[], day: Date): LaidEvent[] {
   const dayStart = startOfDay(day).getTime()
-  // Normalize to [0..1440] minutes within this day.
   const items = evts
     .map((ev) => {
       const s = Math.max(0, (new Date(ev.starts_at).getTime() - dayStart) / 60000)
@@ -539,24 +568,46 @@ function layoutEvents(evts: CalendarEvent[], day: Date): LaidEvent[] {
     })
     .sort((a, b) => a.s - b.s || a.e - b.e)
 
-  // Assign columns.
-  const cols: { end: number }[] = []
-  const colIdx: number[] = []
-  for (const it of items) {
-    let placed = -1
-    for (let i = 0; i < cols.length; i++) {
-      if (cols[i].end <= it.s) { cols[i].end = it.e; placed = i; break }
+  // Build clusters: groups of events connected by overlap chains. A cluster
+  // only counts overlaps among its own members, so two isolated events at
+  // different times get full width instead of being squeezed into narrow
+  // columns because something else on the day happens to overlap a lot.
+  type It = typeof items[number] & { col?: number; cluster?: number }
+  const its = items as It[]
+  let clusterId = 0
+  for (let i = 0; i < its.length; i++) {
+    if (its[i].cluster !== undefined) continue
+    const members = [its[i]]
+    its[i].cluster = clusterId
+    let end = its[i].e
+    for (let j = i + 1; j < its.length; j++) {
+      if (its[j].s < end) {
+        its[j].cluster = clusterId
+        members.push(its[j])
+        if (its[j].e > end) end = its[j].e
+      } else break
     }
-    if (placed === -1) { cols.push({ end: it.e }); placed = cols.length - 1 }
-    colIdx.push(placed)
+    // Column-pack within the cluster.
+    const cols: number[] = [] // each cell = current end-of-column minute
+    for (const m of members) {
+      let placed = -1
+      for (let c = 0; c < cols.length; c++) {
+        if (cols[c] <= m.s) { cols[c] = m.e; placed = c; break }
+      }
+      if (placed === -1) { cols.push(m.e); placed = cols.length - 1 }
+      m.col = placed
+    }
+    const nCols = Math.max(1, cols.length)
+    // Attach cluster width directly on the member for later.
+    for (const m of members) (m as any)._nCols = nCols
+    clusterId++
   }
-  const nCols = Math.max(1, cols.length)
 
-  return items.map((it, i) => ({
+  return its.map((it) => ({
     ev: it.ev,
     topMin: it.s,
     heightMin: it.e - it.s,
-    left: colIdx[i] / nCols,
-    width: 1 / nCols,
+    left: (it.col || 0) / (it as any)._nCols,
+    width: 1 / (it as any)._nCols,
   }))
 }
