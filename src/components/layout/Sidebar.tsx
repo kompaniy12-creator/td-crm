@@ -38,8 +38,8 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'relative flex h-screen flex-col border-r border-white/40 bg-white/70 backdrop-blur-xl shadow-sm transition-all duration-300',
-        'group-data-[theme=dark]/theme:bg-slate-900/60 group-data-[theme=dark]/theme:border-white/10',
+        'relative flex h-screen flex-col border-r border-white/20 bg-white/20 backdrop-blur-xl shadow-sm transition-all duration-300',
+        'group-data-[theme=dark]/theme:bg-slate-900/25 group-data-[theme=dark]/theme:border-white/10',
         sidebarCollapsed ? 'w-16' : 'w-60'
       )}
     >

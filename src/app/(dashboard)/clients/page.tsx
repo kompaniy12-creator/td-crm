@@ -44,7 +44,7 @@ export default function ClientsPage() {
   return (
     <div className="flex h-full flex-col">
       {/* Toolbar */}
-      <div className="flex items-center gap-3 border-b border-white/40 bg-white/70 backdrop-blur-xl px-6 py-3 shadow-sm group-data-[theme=dark]/theme:bg-slate-900/60 group-data-[theme=dark]/theme:border-white/10 group-data-[theme=dark]/theme:text-gray-100">
+      <div className="flex items-center gap-3 border-b border-white/20 bg-white/20 backdrop-blur-xl px-6 py-3 shadow-sm group-data-[theme=dark]/theme:bg-slate-900/25 group-data-[theme=dark]/theme:border-white/10 group-data-[theme=dark]/theme:text-gray-100">
         <h1 className="text-lg font-semibold text-gray-800 group-data-[theme=dark]/theme:text-gray-100">Клиенты — Легализация</h1>
 
         <div className="flex items-center gap-4 ml-4">
