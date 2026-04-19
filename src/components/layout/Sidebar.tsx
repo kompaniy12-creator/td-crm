@@ -39,12 +39,13 @@ export function Sidebar() {
     <aside
       className={cn(
         'relative flex h-screen flex-col border-r border-white/40 bg-white/70 backdrop-blur-xl shadow-sm transition-all duration-300',
+        'group-data-[theme=dark]/theme:bg-slate-900/60 group-data-[theme=dark]/theme:border-white/10',
         sidebarCollapsed ? 'w-16' : 'w-60'
       )}
     >
       {/* Logo */}
       <div className={cn(
-        'flex h-14 items-center border-b border-gray-200/60 px-3',
+        'flex h-14 items-center border-b border-gray-200/60 px-3 group-data-[theme=dark]/theme:border-white/10',
         sidebarCollapsed ? 'justify-center' : 'justify-between'
       )}>
         {!sidebarCollapsed && (
@@ -53,8 +54,8 @@ export function Sidebar() {
               <Briefcase className="h-4 w-4 text-white" />
             </div>
             <div className="leading-tight">
-              <p className="text-sm font-bold text-gray-900">TD Group</p>
-              <p className="text-[11px] text-gray-500">CRM System</p>
+              <p className="text-sm font-bold text-gray-900 group-data-[theme=dark]/theme:text-gray-100">TD Group</p>
+              <p className="text-[11px] text-gray-500 group-data-[theme=dark]/theme:text-gray-300">CRM System</p>
             </div>
           </div>
         )}
@@ -67,6 +68,7 @@ export function Sidebar() {
           onClick={toggleSidebar}
           className={cn(
             'flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm hover:bg-gray-50 hover:text-blue-600 transition-colors',
+            'group-data-[theme=dark]/theme:border-white/10 group-data-[theme=dark]/theme:bg-white/10 group-data-[theme=dark]/theme:text-gray-200 group-data-[theme=dark]/theme:hover:bg-white/20',
             sidebarCollapsed && 'absolute -right-3 top-[60px] z-10'
           )}
           aria-label="Свернуть"
@@ -95,8 +97,8 @@ export function Sidebar() {
                   className={cn(
                     'group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-all',
                     isActive
-                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
-                      : 'text-gray-600 hover:bg-white hover:text-gray-900',
+                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30 group-data-[theme=dark]/theme:bg-blue-500'
+                      : 'text-gray-600 hover:bg-white hover:text-gray-900 group-data-[theme=dark]/theme:text-gray-300 group-data-[theme=dark]/theme:hover:bg-white/10 group-data-[theme=dark]/theme:hover:text-white',
                     sidebarCollapsed && 'justify-center px-2'
                   )}
                   title={sidebarCollapsed ? item.label : undefined}
@@ -104,7 +106,9 @@ export function Sidebar() {
                   <Icon
                     className={cn(
                       'h-[18px] w-[18px] flex-shrink-0 transition-colors',
-                      isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-700'
+                      isActive
+                        ? 'text-white'
+                        : 'text-gray-400 group-hover:text-gray-700 group-data-[theme=dark]/theme:text-gray-400 group-data-[theme=dark]/theme:group-hover:text-white'
                     )}
                   />
                   {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
@@ -117,8 +121,8 @@ export function Sidebar() {
 
       {/* Bottom section */}
       {!sidebarCollapsed && (
-        <div className="border-t border-gray-200/60 p-3">
-          <p className="text-[11px] text-gray-400">TD Group © 2024</p>
+        <div className="border-t border-gray-200/60 p-3 group-data-[theme=dark]/theme:border-white/10">
+          <p className="text-[11px] text-gray-400 group-data-[theme=dark]/theme:text-gray-500">TD Group © 2024</p>
         </div>
       )}
     </aside>

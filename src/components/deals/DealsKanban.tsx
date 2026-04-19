@@ -65,7 +65,7 @@ export function DealsKanban({ deals, pipeline, onDealClick, onAddDeal }: DealsKa
         return (
           <div
             key={stage}
-            className="flex w-[270px] flex-shrink-0 flex-col rounded-xl bg-white/60 backdrop-blur-md border border-white/50 shadow-sm overflow-hidden"
+            className="flex w-[270px] flex-shrink-0 flex-col rounded-xl bg-white/60 backdrop-blur-md border border-white/50 shadow-sm overflow-hidden group-data-[theme=dark]/theme:bg-slate-900/50 group-data-[theme=dark]/theme:border-white/10"
           >
             {/* Colored top bar */}
             <div className={`h-1.5 w-full ${colorClass}`} />

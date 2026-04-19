@@ -6,6 +6,8 @@ import { Briefcase, Eye, EyeOff, Lock, Mail } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useUIStore } from '@/lib/store/ui.store'
+import { findBackground, getActiveTheme } from '@/lib/backgrounds'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -14,6 +16,23 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Pick background + theme from the user's persisted preference so the login
+  // card matches their dashboard chrome. Defaults to the light clouds preset.
+  const { backgroundId, customBackgroundUrl, customBackgroundTheme } = useUIStore()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
+  const bgUrl = mounted
+    ? (backgroundId === 'custom' && customBackgroundUrl
+        ? customBackgroundUrl
+        : findBackground(backgroundId)?.url ??
+          'https://images.unsplash.com/photo-1601297183305-6df142704ea2?auto=format&fit=crop&w=2000&q=80')
+    : 'https://images.unsplash.com/photo-1601297183305-6df142704ea2?auto=format&fit=crop&w=2000&q=80'
+
+  const activeTheme = mounted
+    ? getActiveTheme({ backgroundId, customBackgroundUrl, customBackgroundTheme })
+    : 'light'
 
   useEffect(() => {
     let cancelled = false
@@ -52,10 +71,10 @@ export default function LoginPage() {
 
   return (
     <div
-      className="flex min-h-screen items-center justify-center px-4"
+      data-theme={activeTheme}
+      className="group/theme flex min-h-screen items-center justify-center px-4"
       style={{
-        backgroundImage:
-          'url(https://images.unsplash.com/photo-1601297183305-6df142704ea2?auto=format&fit=crop&w=2000&q=80)',
+        backgroundImage: `url(${bgUrl})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed',
@@ -67,13 +86,13 @@ export default function LoginPage() {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 shadow-lg">
             <Briefcase className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">TD Group CRM</h1>
-          <p className="mt-1 text-sm text-gray-600">Twoja Decyzja — система управления клиентами</p>
+          <h1 className="text-2xl font-bold text-gray-900 group-data-[theme=dark]/theme:text-gray-50">TD Group CRM</h1>
+          <p className="mt-1 text-sm text-gray-600 group-data-[theme=dark]/theme:text-gray-300">Twoja Decyzja — система управления клиентами</p>
         </div>
 
         {/* Card */}
-        <div className="rounded-2xl bg-white/80 backdrop-blur-xl border border-white/60 p-8 shadow-2xl">
-          <h2 className="mb-6 text-xl font-semibold text-gray-900">Войти в систему</h2>
+        <div className="rounded-2xl bg-white/80 backdrop-blur-xl border border-white/60 p-8 shadow-2xl group-data-[theme=dark]/theme:bg-slate-900/60 group-data-[theme=dark]/theme:border-white/10">
+          <h2 className="mb-6 text-xl font-semibold text-gray-900 group-data-[theme=dark]/theme:text-gray-100">Войти в систему</h2>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <Input
@@ -119,7 +138,7 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="mt-4 text-center text-xs text-gray-500">
+        <p className="mt-4 text-center text-xs text-gray-500 group-data-[theme=dark]/theme:text-gray-300">
           © 2024 TD Group. Все права защищены.
         </p>
       </div>

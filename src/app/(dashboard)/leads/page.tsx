@@ -45,7 +45,7 @@ export default function LeadsPage() {
   return (
     <div className="flex h-full flex-col">
       {/* Stats bar */}
-      <div className="flex items-center gap-6 border-b border-white/40 bg-white/70 backdrop-blur-xl px-6 py-3 shadow-sm">
+      <div className="flex items-center gap-6 border-b border-white/40 bg-white/70 backdrop-blur-xl px-6 py-3 shadow-sm group-data-[theme=dark]/theme:bg-slate-900/60 group-data-[theme=dark]/theme:border-white/10 group-data-[theme=dark]/theme:text-gray-100">
         <Stat label="Всего" value={stats.total} />
         <Stat label="Новые" value={stats.new} color="text-blue-600" />
         <Stat label="Контакт" value={stats.contacted} color="text-indigo-600" />
@@ -118,8 +118,8 @@ export default function LeadsPage() {
 function Stat({ label, value, color = 'text-gray-900' }: { label: string; value: number; color?: string }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-sm text-gray-500">{label}:</span>
-      <span className={`text-sm font-semibold ${color}`}>{value}</span>
+      <span className="text-sm text-gray-500 group-data-[theme=dark]/theme:text-gray-300">{label}:</span>
+      <span className={`text-sm font-semibold ${color} group-data-[theme=dark]/theme:text-gray-100`}>{value}</span>
     </div>
   )
 }

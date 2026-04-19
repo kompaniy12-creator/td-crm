@@ -44,8 +44,8 @@ export default function ClientsPage() {
   return (
     <div className="flex h-full flex-col">
       {/* Toolbar */}
-      <div className="flex items-center gap-3 border-b border-white/40 bg-white/70 backdrop-blur-xl px-6 py-3 shadow-sm">
-        <h1 className="text-lg font-semibold text-gray-800">Клиенты — Легализация</h1>
+      <div className="flex items-center gap-3 border-b border-white/40 bg-white/70 backdrop-blur-xl px-6 py-3 shadow-sm group-data-[theme=dark]/theme:bg-slate-900/60 group-data-[theme=dark]/theme:border-white/10 group-data-[theme=dark]/theme:text-gray-100">
+        <h1 className="text-lg font-semibold text-gray-800 group-data-[theme=dark]/theme:text-gray-100">Клиенты — Легализация</h1>
 
         <div className="flex items-center gap-4 ml-4">
           <Stat label="Клиентов" value={`${deals.length}`} />
@@ -102,8 +102,8 @@ export default function ClientsPage() {
 function Stat({ label, value, color = 'text-gray-900' }: { label: string; value: string; color?: string }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-sm text-gray-500">{label}:</span>
-      <span className={`text-sm font-semibold ${color}`}>{value}</span>
+      <span className="text-sm text-gray-500 group-data-[theme=dark]/theme:text-gray-300">{label}:</span>
+      <span className={`text-sm font-semibold ${color} group-data-[theme=dark]/theme:text-gray-100`}>{value}</span>
     </div>
   )
 }

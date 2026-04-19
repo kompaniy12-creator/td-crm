@@ -28,8 +28,11 @@ interface UIState {
   // Background — preset id ('none', 'clouds', ...) or 'custom'
   backgroundId: string
   customBackgroundUrl: string | null
+  /** Manual chrome-theme override for custom backgrounds. null = auto (defaults to 'dark'). */
+  customBackgroundTheme: 'light' | 'dark' | null
   setBackgroundId: (id: string) => void
   setCustomBackgroundUrl: (url: string | null) => void
+  setCustomBackgroundTheme: (theme: 'light' | 'dark' | null) => void
 }
 
 export const useUIStore = create<UIState>()(
@@ -60,8 +63,10 @@ export const useUIStore = create<UIState>()(
 
       backgroundId: 'clouds',
       customBackgroundUrl: null,
+      customBackgroundTheme: null,
       setBackgroundId: (id) => set({ backgroundId: id }),
       setCustomBackgroundUrl: (url) => set({ customBackgroundUrl: url }),
+      setCustomBackgroundTheme: (theme) => set({ customBackgroundTheme: theme }),
     }),
     {
       name: 'td-crm-ui',
@@ -73,6 +78,7 @@ export const useUIStore = create<UIState>()(
         activePipeline: state.activePipeline,
         backgroundId: state.backgroundId,
         customBackgroundUrl: state.customBackgroundUrl,
+        customBackgroundTheme: state.customBackgroundTheme,
       }),
     }
   )

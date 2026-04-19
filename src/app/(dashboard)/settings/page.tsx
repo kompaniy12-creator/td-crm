@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Image as ImageIcon, LogOut, User } from 'lucide-react'
 import { useUIStore } from '@/lib/store/ui.store'
-import { BACKGROUNDS } from '@/lib/backgrounds'
+import { BACKGROUNDS, findBackground, getActiveTheme } from '@/lib/backgrounds'
 import { createClient } from '@/lib/supabase/client'
 
 // TODO: интеграции, уведомления — будущие секции
@@ -14,9 +14,18 @@ export default function SettingsPage() {
   const {
     backgroundId,
     customBackgroundUrl,
+    customBackgroundTheme,
     setBackgroundId,
     setCustomBackgroundUrl,
+    setCustomBackgroundTheme,
   } = useUIStore()
+
+  const activeTheme = getActiveTheme({ backgroundId, customBackgroundUrl, customBackgroundTheme })
+  const activeBg = findBackground(backgroundId)
+  const activeBgLabel =
+    backgroundId === 'custom' && customBackgroundUrl
+      ? 'Своё изображение'
+      : activeBg?.label ?? '—'
 
   const [customInput, setCustomInput] = useState(customBackgroundUrl ?? '')
   const [customError, setCustomError] = useState<string | null>(null)
@@ -80,6 +89,15 @@ export default function SettingsPage() {
           <p className="text-[13px] text-gray-500">
             Выберите фоновое изображение для рабочего пространства.
           </p>
+
+          <div className="flex items-center gap-2 text-[12px] text-gray-500">
+            <span>Активный фон:</span>
+            <span className="font-medium text-gray-800">{activeBgLabel}</span>
+            <span className="text-gray-400">·</span>
+            <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-medium text-gray-600">
+              {activeTheme === 'dark' ? 'тёмная тема' : 'светлая тема'}
+            </span>
+          </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {BACKGROUNDS.map((bg) => {
@@ -153,6 +171,34 @@ export default function SettingsPage() {
             )}
             {backgroundId === 'custom' && customBackgroundUrl && !customError && (
               <p className="mt-2 text-xs text-green-600">Применено пользовательское изображение</p>
+            )}
+
+            {/* Theme override — only meaningful for custom URLs */}
+            {backgroundId === 'custom' && customBackgroundUrl && (
+              <div className="mt-4">
+                <label className="text-xs font-semibold text-gray-700">
+                  Тема для своего фона
+                </label>
+                <div className="mt-2 inline-flex rounded-lg border border-gray-300 bg-white p-0.5 text-[12px] font-medium">
+                  {(['light', 'dark'] as const).map((t) => {
+                    const selected = (customBackgroundTheme ?? 'dark') === t
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setCustomBackgroundTheme(t)}
+                        className={`rounded-md px-3 py-1 transition-colors ${
+                          selected
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {t === 'light' ? 'Светлая' : 'Тёмная'}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
             )}
           </div>
         </div>
