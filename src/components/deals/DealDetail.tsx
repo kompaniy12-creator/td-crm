@@ -151,8 +151,9 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
   const { user: currentUser } = useCurrentUser()
   const stages = PIPELINE_STAGES[deal.pipeline] || []
   const [activeTab, setActiveTab] = useState<'general' | 'links' | 'history'>('general')
-  const [activityTab, setActivityTab] = useState<'task' | 'comment' | 'message'>('task')
+  const [activityTab, setActivityTab] = useState<'task' | 'comment' | 'message' | 'meeting'>('comment')
   const [comment, setComment] = useState('')
+  const [meetingAt, setMeetingAt] = useState('')
   const [isSaving, setIsSaving] = useState(false)
 
   const meta = (deal.metadata || {}) as Record<string, string>
@@ -163,19 +164,84 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
     ...comments.map(c => ({ type: 'comment' as const, date: c.created_at, data: c })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
-  async function handleAddComment() {
-    if (!comment.trim()) return
-    if (!currentUser) return
+  async function handleActivitySubmit() {
+    if (!comment.trim() || !currentUser) return
     setIsSaving(true)
     const supabase = createClient()
-    await supabase.from('comments').insert({
-      content: comment,
-      deal_id: deal.id,
-      author_id: currentUser.id,
-    })
+    const text = comment.trim()
+
+    if (activityTab === 'comment') {
+      await supabase.from('comments').insert({
+        content: text,
+        deal_id: deal.id,
+        author_id: currentUser.id,
+      })
+    } else if (activityTab === 'task') {
+      await supabase.from('tasks').insert({
+        title: text,
+        status: 'todo',
+        priority: 'medium',
+        deal_id: deal.id,
+        contact_id: contact?.id ?? null,
+        created_by: currentUser.id,
+        assigned_to: currentUser.id,
+      })
+    } else if (activityTab === 'message') {
+      await supabase.from('activities').insert({
+        type: 'message',
+        description: text,
+        deal_id: deal.id,
+        contact_id: contact?.id ?? null,
+        user_id: currentUser.id,
+      })
+    } else if (activityTab === 'meeting') {
+      if (!meetingAt) { setIsSaving(false); return }
+      await supabase.from('activities').insert({
+        type: 'meeting',
+        description: text,
+        deal_id: deal.id,
+        contact_id: contact?.id ?? null,
+        user_id: currentUser.id,
+        metadata: { scheduled_at: new Date(meetingAt).toISOString() },
+      })
+      setMeetingAt('')
+    }
+
     setComment('')
     setIsSaving(false)
     router.refresh()
+  }
+
+  function openChannel(channel: 'whatsapp' | 'telegram' | 'phone' | 'email') {
+    if (!contact) return
+    const phone = (contact.phone || '').replace(/\D/g, '')
+    const urls: Record<typeof channel, string | null> = {
+      whatsapp: contact.whatsapp
+        ? `https://wa.me/${contact.whatsapp.replace(/\D/g, '')}`
+        : phone ? `https://wa.me/${phone}` : null,
+      telegram: contact.telegram
+        ? `https://t.me/${contact.telegram.replace(/^@/, '')}`
+        : null,
+      phone: phone ? `tel:+${phone}` : null,
+      email: contact.email ? `mailto:${contact.email}` : null,
+    }
+    const url = urls[channel]
+    if (!url) {
+      alert('Нет контактных данных для этого канала')
+      return
+    }
+    window.open(url, '_blank', 'noopener')
+    if (currentUser) {
+      const supabase = createClient()
+      void supabase.from('activities').insert({
+        type: 'message',
+        description: `Открыт канал: ${channel}`,
+        deal_id: deal.id,
+        contact_id: contact.id,
+        user_id: currentUser.id,
+        metadata: { channel },
+      })
+    }
   }
 
   const [promoteError, setPromoteError] = useState<string | null>(null)
@@ -592,10 +658,25 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
           <div className="flex flex-1 overflow-hidden">
             {/* Left side of right panel: description/notes */}
             <div className="w-10 flex-shrink-0 flex flex-col items-center pt-4 gap-3 border-r border-gray-100">
-              <button className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-white"><MessageCircle className="h-4 w-4" /></button>
-              <button className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-gray-500"><CheckSquare className="h-4 w-4" /></button>
-              <button className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-gray-500"><Send className="h-4 w-4" /></button>
-              <button className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-gray-500"><Calendar className="h-4 w-4" /></button>
+              {([
+                { key: 'comment', icon: MessageCircle, title: 'Комментарий' },
+                { key: 'task', icon: CheckSquare, title: 'Задача' },
+                { key: 'message', icon: Send, title: 'Сообщение клиенту' },
+                { key: 'meeting', icon: Calendar, title: 'Встреча' },
+              ] as const).map(({ key, icon: Icon, title }) => (
+                <button
+                  key={key}
+                  title={title}
+                  onClick={() => setActivityTab(key)}
+                  className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+                    activityTab === key
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                </button>
+              ))}
             </div>
 
             {/* Activity feed */}
@@ -604,46 +685,96 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
               <div className="border-b border-gray-200 bg-white p-3">
                 {/* Activity type tabs */}
                 <div className="flex items-center gap-1 mb-2">
-                  {[
-                    { key: 'task', label: 'Дело' },
+                  {([
                     { key: 'comment', label: 'Комментарий' },
+                    { key: 'task', label: 'Задача' },
                     { key: 'message', label: 'Сообщение' },
-                  ].map(({ key, label }) => (
+                    { key: 'meeting', label: 'Встреча' },
+                  ] as const).map(({ key, label }) => (
                     <button
                       key={key}
-                      onClick={() => setActivityTab(key as typeof activityTab)}
+                      onClick={() => setActivityTab(key)}
                       className={`rounded-full px-3 py-1 text-xs font-medium transition-colors
                         ${activityTab === key ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-100'}`}
                     >
                       {label}
                     </button>
                   ))}
-                  <span className="ml-1 text-xs text-gray-400">Задача</span>
-                  <span className="ml-1 text-xs text-gray-400">Ещё ▾</span>
                 </div>
+
+                {/* Quick channels for message */}
+                {activityTab === 'message' && contact && (
+                  <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                    <span className="text-[11px] text-gray-500 mr-1">Открыть:</span>
+                    <button
+                      onClick={() => openChannel('whatsapp')}
+                      className="rounded-full border border-green-300 bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700 hover:bg-green-100"
+                    >WhatsApp</button>
+                    <button
+                      onClick={() => openChannel('telegram')}
+                      className="rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700 hover:bg-sky-100"
+                    >Telegram</button>
+                    <button
+                      onClick={() => openChannel('phone')}
+                      className="rounded-full border border-gray-300 bg-gray-50 px-2 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-100"
+                    >Позвонить</button>
+                    <button
+                      onClick={() => openChannel('email')}
+                      className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 hover:bg-amber-100"
+                    >Email</button>
+                  </div>
+                )}
+
+                {/* Meeting datetime */}
+                {activityTab === 'meeting' && (
+                  <div className="mb-2 flex items-center gap-2">
+                    <label className="text-[11px] text-gray-500">Когда:</label>
+                    <input
+                      type="datetime-local"
+                      value={meetingAt}
+                      onChange={(e) => setMeetingAt(e.target.value)}
+                      className="rounded border border-gray-200 px-2 py-1 text-xs"
+                    />
+                  </div>
+                )}
 
                 {/* Text area */}
                 <div className="rounded-lg border border-gray-200 bg-white">
                   <textarea
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
-                    placeholder="Что нужно сделать"
+                    placeholder={
+                      activityTab === 'comment' ? 'Комментарий для команды'
+                      : activityTab === 'task' ? 'Что нужно сделать'
+                      : activityTab === 'message' ? 'Что сказать клиенту (записывается в историю)'
+                      : 'Тема встречи'
+                    }
                     rows={2}
                     className="w-full resize-none rounded-t-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:outline-none"
                   />
                   <div className="flex items-center justify-between px-3 py-1.5 border-t border-gray-100">
                     <div className="flex items-center gap-2">
-                      <button className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
+                      <span className="flex items-center gap-1 text-xs text-gray-400">
                         <User className="h-3.5 w-3.5" />
-                        Пригласить к обсуждению
-                      </button>
+                        {currentUser?.fullName || currentUser?.email || '—'}
+                      </span>
                     </div>
                     <button
-                      onClick={handleAddComment}
-                      disabled={!comment.trim() || isSaving}
+                      onClick={handleActivitySubmit}
+                      disabled={
+                        !comment.trim() ||
+                        isSaving ||
+                        !currentUser ||
+                        (activityTab === 'meeting' && !meetingAt)
+                      }
                       className="rounded-lg bg-green-500 px-3 py-1 text-xs font-semibold text-white hover:bg-green-600 disabled:opacity-40 transition-colors"
                     >
-                      {isSaving ? 'Сохранение...' : 'Что нужно сделать'}
+                      {isSaving
+                        ? 'Сохранение...'
+                        : activityTab === 'comment' ? 'Добавить комментарий'
+                        : activityTab === 'task' ? 'Создать задачу'
+                        : activityTab === 'message' ? 'Сохранить в историю'
+                        : 'Запланировать встречу'}
                     </button>
                   </div>
                 </div>
