@@ -3,17 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-
-type Target =
-  | { kind: 'deal'; dealId: string; column: string }
-  | { kind: 'deal_meta'; dealId: string; metaKey: string }
-  | { kind: 'contact'; contactId: string; column: string }
-  | { kind: 'lead'; leadId: string; column: string }
+import { usePendingChanges, type EditTarget } from './PendingChanges'
 
 export interface EditableFieldProps {
   label: string
   value?: string | number | null
-  target: Target
+  target: EditTarget
   required?: boolean
   type?: 'text' | 'number' | 'date' | 'email' | 'tel' | 'textarea'
   placeholder?: string
@@ -24,28 +19,50 @@ export function EditableField({
   label, value, target, required = false, type = 'text', placeholder, format,
 }: EditableFieldProps) {
   const router = useRouter()
+  const pending = usePendingChanges()
+
+  // If there's a staged (unsaved) change for this field, show that instead of DB value
+  const staged = pending?.getStaged(target)
+  const effectiveValue = staged?.has ? (staged.value ?? null) : (value ?? null)
+
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(value == null ? '' : String(value))
+  const [draft, setDraft] = useState(effectiveValue == null ? '' : String(effectiveValue))
   const [saving, setSaving] = useState(false)
 
-  const isEmpty = value === null || value === undefined || value === '' || (typeof value === 'number' && value === 0)
+  const isEmpty = effectiveValue === null || effectiveValue === undefined || effectiveValue === '' || (typeof effectiveValue === 'number' && effectiveValue === 0)
   const highlight = required && isEmpty
-  const displayValue = !isEmpty && format && value != null ? format(value) : (value == null ? '' : String(value))
+  const displayValue = !isEmpty && format && effectiveValue != null ? format(effectiveValue) : (effectiveValue == null ? '' : String(effectiveValue))
+  const isDirty = !!staged?.has
 
-  async function save() {
-    const current = value == null ? '' : String(value)
-    if (draft === current) { setEditing(false); return }
-    setSaving(true)
-    const supabase = createClient()
-
-    // Parse numeric values
-    let val: string | number | null = draft
+  function parseDraft(): string | number | null {
     if (type === 'number') {
-      val = draft === '' ? null : Number(draft)
-    } else if (draft === '') {
-      val = null
+      return draft === '' ? null : Number(draft)
+    }
+    return draft === '' ? null : draft
+  }
+
+  async function commit() {
+    const current = effectiveValue == null ? '' : String(effectiveValue)
+    if (draft === current) { setEditing(false); return }
+
+    const val = parseDraft()
+
+    // Buffered mode: stage into context, show Save button in parent bar
+    if (pending) {
+      // If reverted to DB value, discard staged entry
+      const dbCurrent = value == null ? '' : String(value)
+      if (draft === dbCurrent) {
+        pending.discard(target)
+      } else {
+        pending.stage(target, val)
+      }
+      setEditing(false)
+      return
     }
 
+    // Fallback: save immediately
+    setSaving(true)
+    const supabase = createClient()
     try {
       if (target.kind === 'deal') {
         await supabase.from('deals').update({ [target.column]: val }).eq('id', target.dealId)
@@ -65,21 +82,27 @@ export function EditableField({
     }
   }
 
+  function cancel() {
+    setDraft(effectiveValue == null ? '' : String(effectiveValue))
+    setEditing(false)
+  }
+
   if (editing) {
     return (
-      <div className={`py-1.5 -mx-2 px-2 rounded ${highlight ? 'bg-red-50 border-l-2 border-red-400' : ''}`}>
+      <div className={`py-1.5 -mx-2 px-2 rounded ${highlight ? 'bg-red-50 border-l-2 border-red-400' : isDirty ? 'bg-amber-50 border-l-2 border-amber-400' : ''}`}>
         <div className="text-xs text-gray-400 leading-tight mb-1">
           {label}{required && <span className="text-red-500 ml-1">*</span>}
+          {isDirty && <span className="ml-2 text-[10px] font-semibold text-amber-600">● не сохранено</span>}
         </div>
         {type === 'textarea' ? (
           <textarea
             autoFocus
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            onBlur={save}
+            onBlur={commit}
             onKeyDown={(e) => {
-              if (e.key === 'Escape') { setDraft(value == null ? '' : String(value)); setEditing(false) }
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) save()
+              if (e.key === 'Escape') cancel()
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) commit()
             }}
             disabled={saving}
             rows={3}
@@ -91,10 +114,10 @@ export function EditableField({
             type={type}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            onBlur={save}
+            onBlur={commit}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') save()
-              if (e.key === 'Escape') { setDraft(value == null ? '' : String(value)); setEditing(false) }
+              if (e.key === 'Enter') commit()
+              if (e.key === 'Escape') cancel()
             }}
             disabled={saving}
             className="w-full rounded border border-blue-400 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
@@ -106,15 +129,20 @@ export function EditableField({
 
   return (
     <div
-      onClick={() => setEditing(true)}
+      onClick={() => { setDraft(effectiveValue == null ? '' : String(effectiveValue)); setEditing(true) }}
       className={`py-1.5 -mx-2 px-2 rounded cursor-pointer transition-colors ${
-        highlight ? 'bg-red-50 border-l-2 border-red-400 hover:bg-red-100' : 'hover:bg-blue-50'
+        highlight
+          ? 'bg-red-50 border-l-2 border-red-400 hover:bg-red-100'
+          : isDirty
+            ? 'bg-amber-50 border-l-2 border-amber-400 hover:bg-amber-100'
+            : 'hover:bg-blue-50'
       }`}
-      title="Нажмите, чтобы изменить"
+      title={isDirty ? 'Изменено — нажмите «Сохранить» внизу' : 'Нажмите, чтобы изменить'}
     >
       <div className="text-xs text-gray-400 leading-tight">
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}
+        {isDirty && <span className="ml-2 text-[10px] font-semibold text-amber-600">● не сохранено</span>}
       </div>
       <div className={`text-sm leading-snug mt-0.5 whitespace-pre-wrap ${
         !isEmpty ? 'text-gray-900' : highlight ? 'text-red-500 font-medium' : 'text-gray-400'

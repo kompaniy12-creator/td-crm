@@ -13,6 +13,7 @@ import { PIPELINE_STAGES, PIPELINE_LABELS, SALES_PIPELINE, SALES_FINAL_STAGE } f
 import { checkContractReadiness } from '@/lib/contract/requirements'
 import { promoteDealToClient } from '@/lib/api/promote'
 import { EditableField } from '@/components/common/EditableField'
+import { PendingChangesProvider, PendingChangesBar } from '@/components/common/PendingChanges'
 import { ContactLinker } from './ContactLinker'
 import { ClientJourney } from './ClientJourney'
 
@@ -131,7 +132,16 @@ interface Props {
   comments: Comment[]
 }
 
-export function DealDetail({ deal, contact, activities, comments }: Props) {
+export function DealDetail(props: Props) {
+  return (
+    <PendingChangesProvider>
+      <DealDetailInner {...props} />
+      <PendingChangesBar />
+    </PendingChangesProvider>
+  )
+}
+
+function DealDetailInner({ deal, contact, activities, comments }: Props) {
   const router = useRouter()
   const stages = PIPELINE_STAGES[deal.pipeline] || []
   const [activeTab, setActiveTab] = useState<'general' | 'links' | 'history'>('general')

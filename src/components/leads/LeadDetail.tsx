@@ -10,6 +10,7 @@ import type { Lead, Contact, Activity, LeadStatus, ServiceType, LeadSource } fro
 import { SOURCE_LABELS } from '@/types'
 import { PromoteLeadModal } from './PromoteLeadModal'
 import { EditableField } from '@/components/common/EditableField'
+import { PendingChangesProvider, PendingChangesBar } from '@/components/common/PendingChanges'
 import { Avatar } from '@/components/ui/avatar'
 
 const STATUS_LABELS: Record<LeadStatus, string> = {
@@ -105,7 +106,16 @@ interface Props {
   contact: Contact | null
 }
 
-export function LeadDetail({ lead, contact }: Props) {
+export function LeadDetail(props: Props) {
+  return (
+    <PendingChangesProvider>
+      <LeadDetailInner {...props} />
+      <PendingChangesBar />
+    </PendingChangesProvider>
+  )
+}
+
+function LeadDetailInner({ lead, contact }: Props) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'general' | 'history'>('general')
   const [statusOpen, setStatusOpen] = useState(false)
