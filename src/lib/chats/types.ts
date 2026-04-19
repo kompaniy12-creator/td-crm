@@ -36,6 +36,15 @@ export interface ChatThread {
     phone: string | null
     email: string | null
   } | null
+  // Gmail-specific (null/default for other channels)
+  gmail_labels?: string[] | null
+  gmail_category?: string | null
+  starred?: boolean
+  archived?: boolean
+  trashed?: boolean
+  spam?: boolean
+  snippet?: string | null
+  pending_sync?: boolean
 }
 
 export interface ChatMessage {
@@ -51,6 +60,13 @@ export interface ChatMessage {
   error: string | null
   read_at: string | null
   created_at: string
+  // Gmail-specific
+  subject?: string | null
+  from_address?: string | null
+  to_addresses?: string | null
+  cc_addresses?: string | null
+  body_html?: string | null
+  message_date?: string | null
 }
 
 export interface Integration {

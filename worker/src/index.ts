@@ -169,10 +169,21 @@ async function drainOutbound() {
           externalId = await sendWhatsApp(integration, thr.external_thread_id, msg.body || '')
           break
         case 'gmail': {
+          // Prefer per-message outbound meta written by the /mail composer.
+          const atts = (msg.attachments as any[]) || []
+          const meta = Array.isArray(atts) ? atts.find((a) => a?.kind === 'email_outbound') : null
           const contact = (thr as any).contacts
-          const to = contact?.email
-          if (!to) throw new Error('Нет email у контакта')
-          externalId = await sendGmail(integration, to, 'Re: CRM', msg.body || '')
+          const to: string | null = meta?.to || contact?.email || null
+          if (!to) throw new Error('Нет email получателя')
+          const subject: string = meta?.subject || 'Re: (без темы)'
+          const res = await sendGmail(integration, to, subject, msg.body || '', {
+            html: meta?.html || null,
+            cc: meta?.cc || null,
+            inReplyTo: meta?.in_reply_to || null,
+            references: meta?.references || null,
+            threadId: thr.external_thread_id || null,
+          })
+          externalId = res.id
           break
         }
         case 'facebook_messenger':
