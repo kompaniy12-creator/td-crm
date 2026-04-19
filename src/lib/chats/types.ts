@@ -10,6 +10,7 @@ export type ChatChannel =
   | 'viber'
   | 'sms'
   | 'web_widget'
+  | 'google_calendar'
 
 export type AuthFlow = 'form' | 'qr' | 'otp' | 'oauth'
 
@@ -78,6 +79,7 @@ export const CHANNEL_LABELS: Record<string, string> = {
   viber: 'Viber',
   sms: 'SMS',
   web_widget: 'Сайт',
+  google_calendar: 'Google Календарь',
 }
 
 export const CHANNEL_COLORS: Record<string, string> = {
@@ -92,6 +94,7 @@ export const CHANNEL_COLORS: Record<string, string> = {
   viber: 'bg-purple-500',
   sms: 'bg-gray-500',
   web_widget: 'bg-indigo-500',
+  google_calendar: 'bg-blue-500',
 }
 
 export interface CredentialField {
@@ -286,6 +289,26 @@ export const CHANNEL_SPECS: ChannelSpec[] = [
       { name: 'api_key', label: 'API Key', type: 'password', required: true },
       { name: 'from_number', label: 'Отправитель' },
     ],
+  },
+  {
+    kind: 'google_calendar',
+    label: 'Google Календарь',
+    tagline: 'Войти через Google',
+    description:
+      'Двусторонняя синхронизация с Google Calendar: события, созданные в CRM, уходят в ваш календарь; события из Google подтягиваются в CRM.',
+    flow: 'oauth',
+    oauth: {
+      provider: 'google',
+      authEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+      scopes: [
+        'https://www.googleapis.com/auth/calendar',
+        'https://www.googleapis.com/auth/calendar.events',
+        'openid', 'email', 'profile',
+      ],
+      clientIdEnv: 'NEXT_PUBLIC_GOOGLE_CLIENT_ID',
+      redirectPath: '/oauth/google',
+    },
+    note: 'Использует тот же Google OAuth-клиент, что и Gmail. Настраивается в разделе «OAuth-приложения».',
   },
   {
     kind: 'web_widget',

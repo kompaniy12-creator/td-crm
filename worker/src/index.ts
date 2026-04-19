@@ -6,9 +6,10 @@ import { startWhatsAppQR, sendWhatsApp, stopWhatsApp } from './channels/whatsapp
 import { startTelegramPersonal, sendTelegramPersonal, stopTelegramPersonal, driveOtpFlow } from './channels/telegram_personal.js'
 import { pollGmail, sendGmail } from './channels/gmail.js'
 import { pollFacebook, sendFacebook } from './channels/facebook.js'
+import { pollGoogleCalendar, drainGoogleCalendarOutbound } from './channels/google_calendar.js'
 import { startWebhookServer } from './webhooks.js'
 
-const running = new Map<string, { kind: string; lastGmailPoll?: number; lastFbPoll?: number }>()
+const running = new Map<string, { kind: string; lastGmailPoll?: number; lastFbPoll?: number; lastCalPoll?: number; lastCalDrain?: number }>()
 
 async function tick() {
   const { data, error } = await supabase.from('integrations').select('*')
@@ -56,6 +57,26 @@ async function tick() {
         }
       }
 
+      // Google Calendar: incremental sync every 60s + outbound drain every 15s.
+      if (it.kind === 'google_calendar') {
+        if (it.status === 'connecting') {
+          await pollGoogleCalendar(it)
+          running.set(it.id, { kind: 'google_calendar', lastCalPoll: Date.now() })
+        } else if (it.status === 'active') {
+          const r = running.get(it.id) || { kind: 'google_calendar' }
+          const now = Date.now()
+          if (!r.lastCalDrain || now - r.lastCalDrain > 15_000) {
+            await drainGoogleCalendarOutbound(it)
+            r.lastCalDrain = now
+          }
+          if (!r.lastCalPoll || now - r.lastCalPoll > 60_000) {
+            await pollGoogleCalendar(it)
+            r.lastCalPoll = now
+          }
+          running.set(it.id, r)
+        }
+      }
+
       // Drive in-progress Telegram OTP flow.
       if (it.kind === 'telegram_personal' && it.status === 'connecting') {
         const as = (it.auth_state as Record<string, unknown>) || {}
@@ -92,6 +113,8 @@ async function startChannel(it: Integration) {
     case 'facebook_messenger':
     case 'instagram':
       await pollFacebook(it); break
+    case 'google_calendar':
+      await pollGoogleCalendar(it); break
     default:
       log.debug({ kind: it.kind }, 'no handler for kind (scaffolded TODO)')
       return
