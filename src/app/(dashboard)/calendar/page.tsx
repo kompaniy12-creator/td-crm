@@ -504,7 +504,7 @@ function DayTimeColumn({
       )}
 
       {/* Events */}
-      {laid.map(({ ev, topMin, heightMin, left, width }) => {
+      {laid.map(({ ev, topMin, heightMin, left, width, zIndex }) => {
         const s = styleFor(ev)
         const heightPx = Math.max((heightMin / 60) * HOUR_PX - 2, 20)
         const showTime = heightMin >= 25
@@ -513,12 +513,13 @@ function DayTimeColumn({
           <button
             key={ev.id}
             onClick={(e) => { e.stopPropagation(); onEdit(ev) }}
-            className="absolute flex flex-col overflow-hidden rounded-md px-2 py-1 text-left shadow-sm hover:brightness-95"
+            className="absolute flex flex-col overflow-hidden rounded-md border border-white/30 px-2 py-1 text-left shadow-sm hover:z-30 hover:brightness-95"
             style={{
               top: `${(topMin / 60) * HOUR_PX}px`,
               height: `${heightPx}px`,
               left: `calc(${left * 100}% + 2px)`,
               width: `calc(${width * 100}% - 4px)`,
+              zIndex,
               fontSize: '12px',
               lineHeight: '1.15',
               ...s,
@@ -556,6 +557,7 @@ interface LaidEvent {
   heightMin: number
   left: number   // 0–1
   width: number  // 0–1
+  zIndex: number
 }
 
 function layoutEvents(evts: CalendarEvent[], day: Date): LaidEvent[] {
@@ -603,11 +605,22 @@ function layoutEvents(evts: CalendarEvent[], day: Date): LaidEvent[] {
     clusterId++
   }
 
-  return its.map((it) => ({
-    ev: it.ev,
-    topMin: it.s,
-    heightMin: it.e - it.s,
-    left: (it.col || 0) / (it as any)._nCols,
-    width: 1 / (it as any)._nCols,
-  }))
+  return its.map((it) => {
+    const nCols = (it as any)._nCols as number
+    const col = it.col || 0
+    // Google-style staircase: each overlapping event extends to the right
+    // edge of the day column, later ones offset and stacked on top. Earlier
+    // events stay visible on the left, where the cascade doesn't cover them.
+    const offsetPerCol = nCols === 1 ? 0 : Math.min(0.35, 0.9 / nCols)
+    const left = col * offsetPerCol
+    const width = 1 - left
+    return {
+      ev: it.ev,
+      topMin: it.s,
+      heightMin: it.e - it.s,
+      left,
+      width,
+      zIndex: col + 1,
+    }
+  })
 }
