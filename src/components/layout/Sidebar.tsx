@@ -7,6 +7,7 @@ import {
   BarChart2,
   CheckSquare,
   Calendar,
+  Mail,
   MessageSquare,
   Settings,
   ChevronLeft,
@@ -19,6 +20,7 @@ import {
 import { cn } from '@/lib/utils/cn'
 import { useUIStore } from '@/lib/store/ui.store'
 import { useUnreadChats } from '@/lib/hooks/useUnreadChats'
+import { useUnreadMail } from '@/lib/hooks/useUnreadMail'
 
 const navItems = [
   { href: '/', icon: Home, label: 'Дашборд' },
@@ -28,6 +30,7 @@ const navItems = [
   { href: '/clients', icon: UserCheck, label: 'Клиенты' },
   { href: '/tasks', icon: CheckSquare, label: 'Задачи' },
   { href: '/calendar', icon: Calendar, label: 'Календарь' },
+  { href: '/mail', icon: Mail, label: 'Почта' },
   { href: '/chats', icon: MessageSquare, label: 'Чаты' },
   { href: '/settings', icon: Settings, label: 'Настройки' },
 ]
@@ -36,6 +39,7 @@ export function Sidebar() {
   const pathname = usePathname()
   const { sidebarCollapsed, toggleSidebar } = useUIStore()
   const unreadChats = useUnreadChats()
+  const unreadMail = useUnreadMail()
 
   return (
     <aside
@@ -91,7 +95,10 @@ export function Sidebar() {
               ? pathname === '/'
               : pathname.startsWith(item.href)
             const Icon = item.icon
-            const badge = item.href === '/chats' && unreadChats > 0 ? unreadChats : 0
+            const badge =
+              item.href === '/chats' && unreadChats > 0 ? unreadChats
+              : item.href === '/mail' && unreadMail > 0 ? unreadMail
+              : 0
 
             return (
               <li key={item.href}>

@@ -23,6 +23,7 @@ export default function ChatsPage() {
     const { data } = await supabase
       .from('chat_threads')
       .select('*, contacts(id, first_name, last_name, phone, email)')
+      .neq('channel', 'gmail')
       .order('last_message_at', { ascending: false, nullsFirst: false })
       .limit(200)
     setThreads((data as ChatThread[]) || [])
