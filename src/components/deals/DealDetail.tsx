@@ -18,6 +18,8 @@ import { PendingChangesProvider, PendingChangesBar } from '@/components/common/P
 import { ContactLinker } from './ContactLinker'
 import { DealReminders } from './DealReminders'
 import { DealAttachments } from './DealAttachments'
+import { DealTasks } from './DealTasks'
+import { DealContract } from './DealContract'
 import { ClientJourney } from './ClientJourney'
 
 // Stage bar colors — same as kanban
@@ -509,6 +511,17 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
             <EditableField label="Номер дома / кв." value={meta.house_number} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'house_number' }} />
             <EditableField label="Почтовый индекс" value={meta.postal_code} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'postal_code' }} />
           </div>
+
+          {/* ДОГОВОР */}
+          <DealContract
+            dealId={deal.id}
+            dealNumber={deal.number ?? null}
+            metadata={(deal.metadata || {}) as Record<string, unknown>}
+            onChanged={() => router.refresh()}
+          />
+
+          {/* ЗАДАЧИ */}
+          <DealTasks dealId={deal.id} contactId={contact?.id ?? null} />
 
           {/* НАПОМИНАНИЯ */}
           <DealReminders dealId={deal.id} contactId={contact?.id ?? null} />
