@@ -1,7 +1,8 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { Download, Printer, Save, ChevronDown, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { checkContractReadiness } from '@/lib/contract/requirements'
 import { lookupColumn, lookupValue } from '@/lib/utils/lookup'
@@ -107,22 +108,15 @@ function buildContractHtml(deal: Deal, contact: Contact | null) {
   .contract-body .consent-block ul { padding-left: 20px; margin: 10px 0; }
   .contract-body .consent-block ul li { margin-bottom: 8px; list-style-type: disc; font-size: 11.5pt; }
   .contract-body .final-sig { margin-top: 40px; text-align: right; }
-  .print-btn {
-    position: fixed; top: 16px; right: 16px;
-    background: #1a3a6b; color: #fff; border: none;
-    padding: 10px 22px; border-radius: 6px; cursor: pointer;
-    font-size: 13px; font-weight: bold;
-    box-shadow: 0 2px 8px rgba(0,0,0,.3); z-index: 100;
-  }
-  .print-btn:hover { background: #0f2a52; }
   @media print {
+    .contract-toolbar { display: none !important; }
+    body { background: #fff !important; }
     .contract-body { background: #fff; padding: 0; }
     .contract-body .page { box-shadow: none; padding: 50px 60px; }
-    .print-btn { display: none; }
+    @page { margin: 15mm; }
   }
 </style>
 <div class="contract-body">
-<button class="print-btn" onclick="window.print()">🖨️ Drukuj / Печать</button>
 <div class="page">
 <h1>UMOWA O ŚWIADCZENIE USŁUG</h1>
 <div class="meta">
@@ -300,7 +294,7 @@ function ContractInner() {
     | { status: 'loading' }
     | { status: 'notFound' }
     | { status: 'missing'; html: string }
-    | { status: 'ready'; html: string; title: string }
+    | { status: 'ready'; html: string; title: string; dealUuid: string; displayNo: string; filenameBase: string }
   >({ status: 'loading' })
 
   useEffect(() => {
@@ -339,7 +333,19 @@ function ContractInner() {
         return
       }
       const html = buildContractHtml(deal as Deal, contact)
-      setState({ status: 'ready', html, title: `Umowa ${displayNo}` })
+      const clientName = contact
+        ? [contact.first_name, contact.last_name].filter(Boolean).join(' ').trim()
+        : ''
+      const safeClient = clientName.replace(/[^\p{L}\p{N}\s_-]/gu, '').replace(/\s+/g, '_')
+      const filenameBase = `Umowa_${displayNo}${safeClient ? '_' + safeClient : ''}`
+      setState({
+        status: 'ready',
+        html,
+        title: `Umowa ${displayNo}`,
+        dealUuid,
+        displayNo: String(displayNo),
+        filenameBase,
+      })
     })()
   }, [id])
 
@@ -363,7 +369,226 @@ function ContractInner() {
       </div>
     )
   }
-  return <div dangerouslySetInnerHTML={{ __html: state.html }} />
+  if (state.status === 'missing') {
+    return <div dangerouslySetInnerHTML={{ __html: state.html }} />
+  }
+  return <ContractView state={state} />
+}
+
+type ReadyState = {
+  status: 'ready'
+  html: string
+  title: string
+  dealUuid: string
+  displayNo: string
+  filenameBase: string
+}
+
+function ContractView({ state }: { state: ReadyState }) {
+  const docRef = useRef<HTMLDivElement>(null)
+  const [downloadOpen, setDownloadOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!downloadOpen) return
+    const onClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('[data-download-menu]')) setDownloadOpen(false)
+    }
+    document.addEventListener('click', onClick)
+    return () => document.removeEventListener('click', onClick)
+  }, [downloadOpen])
+
+  function triggerDownload(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 2000)
+  }
+
+  function downloadHtml() {
+    const full = `<!doctype html><html><head><meta charset="utf-8"><title>${state.title}</title></head><body>${state.html}</body></html>`
+    triggerDownload(new Blob([full], { type: 'text/html;charset=utf-8' }), `${state.filenameBase}.html`)
+    setDownloadOpen(false)
+  }
+
+  function downloadDocx() {
+    // Word opens HTML files with .doc extension. The Office-specific prelude
+    // improves rendering fidelity for paragraphs/tables.
+    const prelude = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset="utf-8"><title>${state.title}</title></head><body>`
+    const full = prelude + state.html + '</body></html>'
+    triggerDownload(
+      new Blob(['\ufeff', full], { type: 'application/msword' }),
+      `${state.filenameBase}.doc`,
+    )
+    setDownloadOpen(false)
+  }
+
+  function downloadTxt() {
+    const node = docRef.current
+    if (!node) return
+    const text = node.innerText.replace(/\n{3,}/g, '\n\n').trim()
+    triggerDownload(new Blob([text], { type: 'text/plain;charset=utf-8' }), `${state.filenameBase}.txt`)
+    setDownloadOpen(false)
+  }
+
+  async function downloadPdf() {
+    setDownloadOpen(false)
+    const node = docRef.current
+    if (!node) return
+    const html2pdfModule = await import('html2pdf.js')
+    const html2pdf = (html2pdfModule as { default: () => { set: (o: unknown) => { from: (el: HTMLElement) => { save: () => Promise<void> } } } }).default
+    await html2pdf()
+      .set({
+        margin: [12, 12, 12, 12],
+        filename: `${state.filenameBase}.pdf`,
+        image: { type: 'jpeg', quality: 0.96 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'] },
+      })
+      .from(node)
+      .save()
+  }
+
+  async function saveToDeal() {
+    setSaving(true)
+    try {
+      const supabase = createClient()
+      const { data: cur } = await supabase
+        .from('deals')
+        .select('metadata')
+        .eq('id', state.dealUuid)
+        .single()
+      const mergedMeta = {
+        ...((cur?.metadata as Record<string, unknown>) || {}),
+        contract_html: state.html,
+        contract_generated_at: new Date().toISOString(),
+        contract_number: state.displayNo,
+      }
+      await supabase.from('deals').update({ metadata: mergedMeta }).eq('id', state.dealUuid)
+      await supabase.from('activities').insert({
+        type: 'note',
+        description: `Договор № ${state.displayNo} сохранён в карточке сделки`,
+        deal_id: state.dealUuid,
+        user_id: '00000000-0000-0000-0000-000000000000',
+      })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
+      <div
+        className="contract-toolbar"
+        style={{
+          position: 'fixed',
+          top: 12,
+          right: 12,
+          display: 'flex',
+          gap: 8,
+          zIndex: 100,
+          fontFamily: 'system-ui, sans-serif',
+        }}
+      >
+        {/* Download dropdown */}
+        <div data-download-menu style={{ position: 'relative' }}>
+          <button
+            onClick={() => setDownloadOpen((o) => !o)}
+            style={toolbarBtnStyle('#1a3a6b')}
+          >
+            <Download size={14} /> Скачать <ChevronDown size={12} />
+          </button>
+          {downloadOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 6px)',
+                right: 0,
+                minWidth: 180,
+                background: '#fff',
+                border: '1px solid #e5e7eb',
+                borderRadius: 8,
+                boxShadow: '0 6px 24px rgba(0,0,0,.12)',
+                overflow: 'hidden',
+              }}
+            >
+              {[
+                { label: 'PDF', onClick: downloadPdf },
+                { label: 'Word (.doc)', onClick: downloadDocx },
+                { label: 'HTML', onClick: downloadHtml },
+                { label: 'Текст (.txt)', onClick: downloadTxt },
+              ].map((opt) => (
+                <button
+                  key={opt.label}
+                  onClick={opt.onClick}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '10px 14px',
+                    fontSize: 13,
+                    color: '#111',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = '#f3f4f6')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={saveToDeal}
+          disabled={saving}
+          style={toolbarBtnStyle(saved ? '#16a34a' : '#0f766e')}
+        >
+          {saved ? <Check size={14} /> : <Save size={14} />}
+          {saved ? 'Сохранено' : saving ? 'Сохранение…' : 'В карточку'}
+        </button>
+
+        <button
+          onClick={() => window.print()}
+          style={toolbarBtnStyle('#1a3a6b')}
+        >
+          <Printer size={14} /> Печать
+        </button>
+      </div>
+
+      <div ref={docRef} dangerouslySetInnerHTML={{ __html: state.html }} />
+    </>
+  )
+}
+
+function toolbarBtnStyle(bg: string): React.CSSProperties {
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    background: bg,
+    color: '#fff',
+    border: 'none',
+    padding: '9px 16px',
+    borderRadius: 6,
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: 'pointer',
+    boxShadow: '0 2px 8px rgba(0,0,0,.25)',
+  }
 }
 
 export default function ContractPage() {
