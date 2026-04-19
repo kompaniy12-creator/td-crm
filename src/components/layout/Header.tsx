@@ -40,7 +40,7 @@ export function Header() {
   }
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-white/15 bg-white/10 px-6 shadow-sm group-data-[theme=dark]/theme:bg-slate-900/10 group-data-[theme=dark]/theme:border-white/10">
+    <header className="flex h-14 items-center justify-between border-b border-white/15 bg-white/10 backdrop-blur-sm px-6 shadow-sm group-data-[theme=dark]/theme:bg-slate-900/10 backdrop-blur-sm group-data-[theme=dark]/theme:border-white/10">
       <div className="flex items-center gap-4">
         <h1 className="text-[15px] font-semibold text-gray-900 group-data-[theme=dark]/theme:text-gray-100">{title}</h1>
       </div>
@@ -52,7 +52,7 @@ export function Header() {
           <input
             type="text"
             placeholder="Поиск..."
-            className="h-9 w-72 rounded-full border border-gray-200/80 bg-white/80 pl-10 pr-4 text-[13px] text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 group-data-[theme=dark]/theme:bg-white/10 group-data-[theme=dark]/theme:text-gray-100 group-data-[theme=dark]/theme:placeholder:text-gray-400 group-data-[theme=dark]/theme:border-white/10"
+            className="h-9 w-72 rounded-full border border-gray-200/80 bg-white/80 pl-10 pr-4 text-[13px] text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 group-data-[theme=dark]/theme:bg-white/10 backdrop-blur-sm group-data-[theme=dark]/theme:text-gray-100 group-data-[theme=dark]/theme:placeholder:text-gray-400 group-data-[theme=dark]/theme:border-white/10"
           />
         </div>
 
