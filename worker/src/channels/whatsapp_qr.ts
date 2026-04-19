@@ -1,4 +1,4 @@
-import { makeWASocket, useMultiFileAuthState, DisconnectReason, type WASocket } from '@whiskeysockets/baileys'
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, type WASocket } from 'baileys'
 import QRCode from 'qrcode'
 import path from 'node:path'
 import fs from 'node:fs/promises'
@@ -19,7 +19,12 @@ export async function startWhatsAppQR(it: Integration) {
   const dir = path.join(env.WORKER_DATA_DIR, 'wa', it.id)
   await fs.mkdir(dir, { recursive: true })
   const { state, saveCreds } = await useMultiFileAuthState(dir)
-  const sock = makeWASocket({ auth: state, printQRInTerminal: false })
+  // Fetch current WhatsApp Web protocol version. Without this Baileys uses
+  // a hardcoded version that WA eventually rejects with `405 Method Not
+  // Allowed` during registration, which prevents the QR from ever being
+  // emitted.
+  const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: undefined as any }))
+  const sock = makeWASocket({ auth: state, version, browser: ['TD CRM', 'Chrome', '122.0.0'] })
   socks.set(it.id, sock)
 
   sock.ev.on('creds.update', saveCreds)

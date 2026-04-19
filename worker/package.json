@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p .",
@@ -11,14 +13,14 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
-    "@whiskeysockets/baileys": "^6.7.8",
+    "baileys": "^7.0.0-rc.9",
     "dotenv": "^16.4.5",
     "googleapis": "^144.0.0",
+    "input": "^1.0.1",
     "node-telegram-bot-api": "^0.66.0",
     "pino": "^9.4.0",
     "qrcode": "^1.5.4",
-    "telegram": "^2.26.8",
-    "input": "^1.0.1"
+    "telegram": "^2.26.8"
   },
   "devDependencies": {
     "@types/node": "^22.7.4",
