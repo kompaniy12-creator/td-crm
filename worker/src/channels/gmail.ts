@@ -1,6 +1,6 @@
 import { google } from 'googleapis'
 import { log } from '../log.js'
-import { updateIntegration, setError, type Integration } from '../supabase.js'
+import { supabase, updateIntegration, setError, type Integration } from '../supabase.js'
 import { resolveContact, upsertThread, insertInbound } from '../contacts.js'
 import { getOAuthApp } from '../oauth_apps.js'
 
@@ -43,11 +43,19 @@ async function ensureTokens(it: Integration) {
   return auth
 }
 
+async function readCreds(id: string): Promise<Record<string, any>> {
+  // ensureTokens may have just written fresh tokens to the DB; the `it`
+  // argument is stale. Re-read so subsequent credentials writes don't
+  // clobber the tokens.
+  const { data } = await supabase.from('integrations').select('credentials').eq('id', id).single()
+  return (data?.credentials as Record<string, any>) || {}
+}
+
 export async function pollGmail(it: Integration) {
   try {
     const auth = await ensureTokens(it)
     const gmail = google.gmail({ version: 'v1', auth })
-    const creds = (it.credentials as Record<string, any>) || {}
+    const creds = await readCreds(it.id)
     const lastHistory = creds.last_history_id as string | undefined
 
     if (!lastHistory) {
@@ -103,8 +111,9 @@ export async function pollGmail(it: Integration) {
     }
 
     if (history?.data.historyId) {
+      const fresh = await readCreds(it.id)
       await updateIntegration(it.id, {
-        credentials: { ...creds, last_history_id: String(history.data.historyId) },
+        credentials: { ...fresh, last_history_id: String(history.data.historyId) },
         last_error: null,
         status: 'active',
       })
