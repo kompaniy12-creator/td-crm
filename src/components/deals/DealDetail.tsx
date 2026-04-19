@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Deal, Contact, Activity, Comment } from '@/types'
 import { PIPELINE_STAGES, PIPELINE_LABELS, SALES_PIPELINE, SALES_FINAL_STAGE } from '@/types'
 import { checkContractReadiness } from '@/lib/contract/requirements'
+import { promoteDealToClient } from '@/lib/api/promote'
 import { EditableField } from '@/components/common/EditableField'
 import { ContactLinker } from './ContactLinker'
 import { ClientJourney } from './ClientJourney'
@@ -179,10 +180,9 @@ export function DealDetail({ deal, contact, activities, comments }: Props) {
     setPromoteError(null)
     setPromoting(true)
     try {
-      const res = await fetch(`/api/deals/${deal.id}/promote-to-client`, { method: 'POST' })
-      const data = await res.json()
-      if (!res.ok) {
-        const missingList = data.missing?.map((m: { label: string }) => m.label).join(', ')
+      const data = await promoteDealToClient(deal.id)
+      if (!data.clientDealId) {
+        const missingList = data.missing?.map((m) => m.label).join(', ')
         setPromoteError(
           missingList
             ? `${data.error}: ${missingList}`
@@ -191,7 +191,7 @@ export function DealDetail({ deal, contact, activities, comments }: Props) {
         return
       }
       // Redirect to the new client deal
-      router.push(`/deals/${data.clientDealId}`)
+      router.push(`/deals/detail/?id=${data.clientDealId}`)
     } finally {
       setPromoting(false)
     }
@@ -238,7 +238,7 @@ export function DealDetail({ deal, contact, activities, comments }: Props) {
 
         <div className="ml-auto flex items-center gap-2">
           <button
-            onClick={() => window.open(`/api/contract/${deal.id}`, '_blank')}
+            onClick={() => window.open(`/deals/contract/?id=${deal.id}`, '_blank')}
             title={contractReady
               ? 'Сгенерировать договор'
               : `Заполните обязательные поля (${missingContractFields.length})`}

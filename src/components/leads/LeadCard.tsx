@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils/cn'
 import { formatRelative } from '@/lib/utils/format'
+import { promoteLeadToDeal } from '@/lib/api/promote'
 import type { Lead } from '@/types'
 
 interface LeadCardProps {
@@ -36,10 +37,9 @@ export function LeadCard({ lead, onClick }: LeadCardProps) {
     e.stopPropagation()
     setPromoting(true)
     try {
-      const res = await fetch(`/api/leads/${lead.id}/promote-to-deal`, { method: 'POST' })
-      const data = await res.json()
-      if (res.ok && data.dealId) {
-        router.push(`/deals/${data.dealId}`)
+      const data = await promoteLeadToDeal(lead.id)
+      if (data.dealId) {
+        router.push(`/deals/detail/?id=${data.dealId}`)
       } else {
         alert(data.error || 'Не удалось создать сделку')
       }

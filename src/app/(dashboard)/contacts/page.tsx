@@ -181,7 +181,7 @@ export default function ContactsPage() {
                   return (
                     <tr
                       key={c.id}
-                      onClick={() => router.push(`/contacts/${c.id}`)}
+                      onClick={() => router.push(`/contacts/detail/?id=${c.id}`)}
                       className="cursor-pointer transition-colors hover:bg-blue-50 group"
                     >
                       <td className="px-4 py-3">
@@ -257,7 +257,7 @@ export default function ContactsPage() {
               return (
                 <div
                   key={c.id}
-                  onClick={() => router.push(`/contacts/${c.id}`)}
+                  onClick={() => router.push(`/contacts/detail/?id=${c.id}`)}
                   className="cursor-pointer rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-blue-300 hover:shadow-md transition-all group"
                 >
                   {/* Avatar */}

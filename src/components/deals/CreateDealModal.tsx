@@ -170,7 +170,7 @@ export function CreateDealModal({
       onClose()
 
       if (openAfter && data?.id) {
-        router.push(`/deals/${data.id}`)
+        router.push(`/deals/detail/?id=${data.id}`)
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Ошибка создания сделки')

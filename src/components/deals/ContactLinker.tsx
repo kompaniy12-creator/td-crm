@@ -85,7 +85,7 @@ export function ContactLinker({ dealId, currentContact }: Props) {
           </div>
           <div className="flex-1 min-w-0">
             <a
-              href={`/contacts/${currentContact.id}`}
+              href={`/contacts/detail/?id=${currentContact.id}`}
               className="text-sm font-medium text-blue-600 hover:text-blue-800 truncate block"
             >
               {fullName || 'Без имени'}
@@ -95,7 +95,7 @@ export function ContactLinker({ dealId, currentContact }: Props) {
             </div>
           </div>
           <a
-            href={`/contacts/${currentContact.id}`}
+            href={`/contacts/detail/?id=${currentContact.id}`}
             title="Открыть карточку"
             className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-gray-100 text-gray-400"
           >

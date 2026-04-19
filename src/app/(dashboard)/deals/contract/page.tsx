@@ -1,97 +1,59 @@
-import { createClient } from '@/lib/supabase/server'
-import { NextRequest, NextResponse } from 'next/server'
+'use client'
+
+import { Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { checkContractReadiness } from '@/lib/contract/requirements'
 import type { Deal, Contact } from '@/types'
 
-function pad(n: number) { return String(n).padStart(2, '0') }
-
+function pad(n: number) {
+  return String(n).padStart(2, '0')
+}
 function fmtDate(d: Date) {
   return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`
 }
 
-function renderMissingFieldsPage(dealId: string, missing: { label: string }[]) {
+function renderMissingFieldsHtml(dealId: string, missing: { label: string }[]) {
   const items = missing.map((m) => `<li>${m.label}</li>`).join('')
-  return `<!DOCTYPE html>
-<html lang="ru"><head><meta charset="UTF-8"><title>Невозможно сгенерировать договор</title>
-<style>
-  body { font-family: -apple-system, system-ui, sans-serif; background:#f3f4f6; padding:40px 20px; color:#111; }
-  .card { max-width:560px; margin:0 auto; background:#fff; border-radius:12px; padding:32px; box-shadow:0 4px 24px rgba(0,0,0,.08); }
-  h1 { font-size:20px; margin-bottom:8px; color:#b91c1c; }
-  p { color:#4b5563; line-height:1.5; margin-bottom:16px; }
-  ul { background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:14px 14px 14px 34px; margin:16px 0; }
-  li { margin:6px 0; color:#991b1b; font-weight:500; }
-  .back { display:inline-block; margin-top:12px; padding:10px 18px; background:#2563eb; color:#fff; border-radius:6px; text-decoration:none; font-weight:600; }
-  .back:hover { background:#1d4ed8; }
-  .id { font-family: monospace; font-size:11px; color:#9ca3af; margin-top:24px; }
-</style></head><body>
-<div class="card">
+  return `<style>
+  .missing-card-wrap { font-family: -apple-system, system-ui, sans-serif; background:#f3f4f6; padding:40px 20px; color:#111; min-height:100vh; }
+  .missing-card { max-width:560px; margin:0 auto; background:#fff; border-radius:12px; padding:32px; box-shadow:0 4px 24px rgba(0,0,0,.08); }
+  .missing-card h1 { font-size:20px; margin-bottom:8px; color:#b91c1c; }
+  .missing-card p { color:#4b5563; line-height:1.5; margin-bottom:16px; }
+  .missing-card ul { background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:14px 14px 14px 34px; margin:16px 0; }
+  .missing-card li { margin:6px 0; color:#991b1b; font-weight:500; }
+  .missing-card .back { display:inline-block; margin-top:12px; padding:10px 18px; background:#2563eb; color:#fff; border-radius:6px; text-decoration:none; font-weight:600; }
+  .missing-card .back:hover { background:#1d4ed8; }
+  .missing-card .id { font-family: monospace; font-size:11px; color:#9ca3af; margin-top:24px; }
+</style>
+<div class="missing-card-wrap"><div class="missing-card">
   <h1>⚠️ Договор не может быть сгенерирован</h1>
   <p>Чтобы создать договор, сначала нужно заполнить следующие обязательные поля:</p>
   <ul>${items}</ul>
   <p>Откройте сделку и контакт, заполните недостающие данные и попробуйте снова.</p>
-  <a class="back" href="/deals/${dealId}">← Вернуться к сделке</a>
+  <a class="back" href="/deals/detail/?id=${dealId}">← Вернуться к сделке</a>
   <div class="id">ID сделки: ${dealId}</div>
-</div>
-</body></html>`
+</div></div>`
 }
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params
-  const supabase = await createClient()
-
-  const { data: deal } = await supabase
-    .from('deals')
-    .select('*')
-    .eq('id', id)
-    .single()
-
-  if (!deal) {
-    return new NextResponse('Сделка не найдена', { status: 404 })
-  }
-
-  let contact: Contact | null = null
-  if (deal.contact_id) {
-    const { data } = await supabase
-      .from('contacts')
-      .select('*')
-      .eq('id', deal.contact_id)
-      .single()
-    contact = data
-  }
-
-  // Validate that all required contract fields are filled
-  const { missing, isReady } = checkContractReadiness(deal as Deal, contact)
-  if (!isReady) {
-    return new NextResponse(renderMissingFieldsPage(id, missing), {
-      status: 422,
-      headers: { 'Content-Type': 'text/html; charset=utf-8' },
-    })
-  }
-
+function buildContractHtml(id: string, deal: Deal, contact: Contact | null) {
   const meta = (deal.metadata || {}) as Record<string, string>
   const today = new Date()
   const dateStr = fmtDate(today)
-
-  // Contract number = deal ID (full UUID, as requested: «номер договора это id сделки»)
   const contractNo = String(id)
 
-  // Client fields
   const clientName = contact
     ? [contact.first_name, contact.last_name].filter(Boolean).join(' ')
-    : (deal.title || '___')
+    : deal.title || '___'
   const clientAddress = contact
     ? [contact.address, contact.city, contact.country].filter(Boolean).join(', ') || '___'
-    : (meta.address || '___')
+    : meta.address || '___'
   const passportNo = contact
     ? [contact.passport_series, contact.passport_number].filter(Boolean).join(' ') || '___'
-    : (meta.passport || '___')
+    : meta.passport || '___'
   const clientPhone = contact?.phone || '___'
   const clientEmail = contact?.email || '___'
 
-  // Service fields
   const serviceType = meta.service_type || '___'
   const totalAmount = deal.amount ? `${deal.amount.toLocaleString('pl-PL')}` : '___'
   const prepaymentAmount = meta.prepayment_amount || '___'
@@ -99,25 +61,20 @@ export async function GET(
   const secondPayment = meta.second_payment || '___'
   const secondPaymentDate = meta.second_payment_date || '___'
 
-  // Helper — wrap placeholder value
   const v = (val: string) => `<strong>${val}</strong>`
 
-  const html = `<!DOCTYPE html>
-<html lang="pl">
-<head>
-<meta charset="UTF-8">
-<title>Umowa ${contractNo}</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
+  return `<style>
+  .contract-body * { margin: 0; padding: 0; box-sizing: border-box; }
+  .contract-body {
     font-family: 'Times New Roman', Times, serif;
     font-size: 12pt;
     line-height: 1.6;
     color: #000;
     background: #eee;
     padding: 30px 20px;
+    min-height: 100vh;
   }
-  .page {
+  .contract-body .page {
     max-width: 800px;
     margin: 0 auto;
     background: #fff;
@@ -125,7 +82,7 @@ export async function GET(
     box-shadow: 0 2px 20px rgba(0,0,0,.15);
     min-height: 1100px;
   }
-  h1 {
+  .contract-body h1 {
     font-size: 14pt;
     font-weight: bold;
     text-align: center;
@@ -133,103 +90,51 @@ export async function GET(
     letter-spacing: 1px;
     margin-bottom: 18px;
   }
-  .meta {
-    text-align: center;
-    margin-bottom: 20px;
-    font-size: 11.5pt;
-  }
-  p { margin-bottom: 10px; font-size: 11.5pt; }
-  .section-title {
-    font-weight: bold;
-    text-align: center;
-    margin: 22px 0 8px;
-    font-size: 12pt;
-  }
-  ol { padding-left: 22px; margin: 6px 0 10px; }
-  ol li { margin-bottom: 6px; font-size: 11.5pt; }
-  ol.alpha { list-style-type: lower-alpha; }
-  .signatures {
-    margin-top: 60px;
-    display: flex;
-    justify-content: space-between;
-  }
-  .sig { width: 45%; text-align: center; }
-  .sig-line {
-    border-top: 1px solid #000;
-    margin-top: 50px;
-    padding-top: 6px;
-    font-size: 10pt;
-  }
-  .clause-info { margin-top: 40px; }
-  .clause-info h2 {
-    font-size: 12pt;
-    font-weight: bold;
-    text-align: center;
-    margin-bottom: 12px;
-  }
-  .consent-block {
-    margin-top: 30px;
-    border-top: 1px solid #000;
-    padding-top: 12px;
-  }
-  .consent-block ul { padding-left: 20px; margin: 10px 0; }
-  .consent-block ul li { margin-bottom: 8px; list-style-type: disc; font-size: 11.5pt; }
-  .final-sig {
-    margin-top: 40px;
-    text-align: right;
-  }
+  .contract-body .meta { text-align: center; margin-bottom: 20px; font-size: 11.5pt; }
+  .contract-body p { margin-bottom: 10px; font-size: 11.5pt; }
+  .contract-body .section-title { font-weight: bold; text-align: center; margin: 22px 0 8px; font-size: 12pt; }
+  .contract-body ol { padding-left: 22px; margin: 6px 0 10px; }
+  .contract-body ol li { margin-bottom: 6px; font-size: 11.5pt; }
+  .contract-body ol.alpha { list-style-type: lower-alpha; }
+  .contract-body .signatures { margin-top: 60px; display: flex; justify-content: space-between; }
+  .contract-body .sig { width: 45%; text-align: center; }
+  .contract-body .sig-line { border-top: 1px solid #000; margin-top: 50px; padding-top: 6px; font-size: 10pt; }
+  .contract-body .clause-info { margin-top: 40px; }
+  .contract-body .clause-info h2 { font-size: 12pt; font-weight: bold; text-align: center; margin-bottom: 12px; }
+  .contract-body .consent-block { margin-top: 30px; border-top: 1px solid #000; padding-top: 12px; }
+  .contract-body .consent-block ul { padding-left: 20px; margin: 10px 0; }
+  .contract-body .consent-block ul li { margin-bottom: 8px; list-style-type: disc; font-size: 11.5pt; }
+  .contract-body .final-sig { margin-top: 40px; text-align: right; }
   .print-btn {
-    position: fixed;
-    top: 16px;
-    right: 16px;
-    background: #1a3a6b;
-    color: #fff;
-    border: none;
-    padding: 10px 22px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: bold;
-    box-shadow: 0 2px 8px rgba(0,0,0,.3);
-    z-index: 100;
+    position: fixed; top: 16px; right: 16px;
+    background: #1a3a6b; color: #fff; border: none;
+    padding: 10px 22px; border-radius: 6px; cursor: pointer;
+    font-size: 13px; font-weight: bold;
+    box-shadow: 0 2px 8px rgba(0,0,0,.3); z-index: 100;
   }
   .print-btn:hover { background: #0f2a52; }
   @media print {
-    body { background: #fff; padding: 0; }
-    .page { box-shadow: none; padding: 50px 60px; }
+    .contract-body { background: #fff; padding: 0; }
+    .contract-body .page { box-shadow: none; padding: 50px 60px; }
     .print-btn { display: none; }
   }
 </style>
-</head>
-<body>
-
+<div class="contract-body">
 <button class="print-btn" onclick="window.print()">🖨️ Drukuj / Печать</button>
-
 <div class="page">
-
 <h1>UMOWA O ŚWIADCZENIE USŁUG</h1>
-
 <div class="meta">
-  <p>
-    numer ${v(contractNo)}&nbsp;&nbsp;
-    z dnia ${v(dateStr)}, zawarta w Poznaniu,
-  </p>
+  <p>numer ${v(contractNo)}&nbsp;&nbsp; z dnia ${v(dateStr)}, zawarta w Poznaniu,</p>
   <p>zwana dalej „Umową",</p>
   <p>zawarta pomiędzy:</p>
 </div>
-
-<p>
-TWOJA DECYZJA SPÓŁKA Z OGRANICZONĄ ODPOWIEDZIALNOŚCIĄ, z siedzibą w Poznaniu, 61-819 ul. Stanisława Taczaka 24/301, zarejestrowaną w rejestrze przedsiębiorców Krajowego Rejestru Sądowego prowadzonym przez SĄD REJONOWY POZNAŃ – NOWE MIASTO I WILDA W POZNANIU, VIII WYDZIAŁ GOSPODARCZY KRAJOWEGO REJESTRU SĄDOWEGO, pod numerem KRS 0001199573, o numerze NIP 7831938936, reprezentowaną przez Hanna Kriierenko – Członka Zarządu
-</p>
+<p>TWOJA DECYZJA SPÓŁKA Z OGRANICZONĄ ODPOWIEDZIALNOŚCIĄ, z siedzibą w Poznaniu, 61-819 ul. Stanisława Taczaka 24/301, zarejestrowaną w rejestrze przedsiębiorców Krajowego Rejestru Sądowego prowadzonym przez SĄD REJONOWY POZNAŃ – NOWE MIASTO I WILDA W POZNANIU, VIII WYDZIAŁ GOSPODARCZY KRAJOWEGO REJESTRU SĄDOWEGO, pod numerem KRS 0001199573, o numerze NIP 7831938936, reprezentowaną przez Hanna Kriierenko – Członka Zarządu</p>
 <p>zwanym dalej Zleceniobiorcą,</p>
 <p style="text-align:center"><strong>a</strong></p>
-<p>
-${v(clientName)}, zamieszkały(ą) przy ${v(clientAddress)}, legitymujący(a) się paszportem o numerze ${v(passportNo)}
-</p>
+<p>${v(clientName)}, zamieszkały(ą) przy ${v(clientAddress)}, legitymujący(a) się paszportem o numerze ${v(passportNo)}</p>
 <p>zwanym dalej Zleceniodawcą,</p>
 <p>zwanych łącznie „Stronami", a osobno „Stroną", o następującej treści:</p>
 
-<!-- §1 -->
 <p class="section-title">§ 1<br>Przedmiot umowy</p>
 <p>1. Przedmiotem niniejszej Umowy jest świadczenie przez Zleceniobiorcę na rzecz Zleceniodawcy usług mających na celu obsługę w celu uzyskania legalizacji pobytu w Rzeczypospolitej Polskiej, a w szczególności:</p>
 <ol>
@@ -242,7 +147,6 @@ ${v(clientName)}, zamieszkały(ą) przy ${v(clientAddress)}, legitymujący(a) si
 <p>zwanych dalej „Usługami".</p>
 <p>2. Zleceniobiorca będzie wykonywać obowiązki wynikające z niniejszej Umowy w dowolnym miejscu, umożliwiającym mu wykonywanie Usług zgodnie z postanowieniami niniejszej Umowy.</p>
 
-<!-- §2 -->
 <p class="section-title">§ 2<br>Obowiązki Zleceniobiorcy</p>
 <ol>
   <li>Zleceniobiorca oświadcza, że posiada wszelkie niezbędne kwalifikacje i doświadczenie, gwarantujące prawidłowe wykonanie przedmiotu Umowy i nie istnieją żadne przeszkody prawne i faktyczne uniemożliwiające lub utrudniające mu wykonywanie obowiązków, o których mowa w § 1 ust. 1 Umowy.</li>
@@ -253,7 +157,6 @@ ${v(clientName)}, zamieszkały(ą) przy ${v(clientAddress)}, legitymujący(a) si
   <li>Zleceniobiorca, wykonuje Usługi na własnym sprzęcie (m.in. komputer), koniecznym do należytego wykonywania zleconych Usług. Zleceniobiorca jest odpowiedzialny za zapewnienie prawidłowego działania sprzętu w trakcie wykonywania zleconych mu Usług.</li>
 </ol>
 
-<!-- §3 -->
 <p class="section-title">§ 3<br>Prawa i Obowiązki Zleceniodawcy</p>
 <ol>
   <li>Zleceniodawca zobowiązuje się dostarczać Zleceniobiorcy wszelkie informacje oraz dokumenty niezbędne do prawidłowego wykonywania Usług.</li>
@@ -263,7 +166,6 @@ ${v(clientName)}, zamieszkały(ą) przy ${v(clientAddress)}, legitymujący(a) si
   <li>Zleceniodawca zobowiązany jest do niezwłocznego informowania Zleceniobiorcy o wszelkich zmianach mających wpływ na realizację niniejszej Umowy, w szczególności zmianie adresu zamieszkania, pracodawcy, stanu cywilnego, numeru telefonu, adresu e-mail, dokumentów tożsamości lub innych danych istotnych dla prowadzonego postępowania. Brak poinformowania Zleceniobiorcy o powyższych zmianach zwalnia go z odpowiedzialności za ewentualne negatywne skutki w postępowaniu administracyjnym.</li>
 </ol>
 
-<!-- §4 -->
 <p class="section-title">§ 4<br>Wynagrodzenie i płatność</p>
 <ol>
   <li>Zleceniobiorcy za wykonywanie czynności określonych w § 1 Umowy przysługuje wynagrodzenie w wysokości ${v(totalAmount)} zł, płatne w następujący sposób:
@@ -279,7 +181,6 @@ ${v(clientName)}, zamieszkały(ą) przy ${v(clientAddress)}, legitymujący(a) si
   <li>W przypadku odstąpienia od Umowy przez Zleceniodawcę po rozpoczęciu świadczenia Usług, wniesiona przedpłata nie podlega zwrotowi. Zwrotowi podlega jedynie ta część wynagrodzenia, która nie odpowiada czynnościom już wykonanym przez Zleceniobiorcę.</li>
 </ol>
 
-<!-- §5 -->
 <p class="section-title">§ 5<br>Rozwiązanie</p>
 <ol>
   <li>Strony są uprawnione do wypowiedzenia niniejszej Umowy na piśmie w każdym czasie, w drodze porozumienia. Jeśli Strony nie postanowią inaczej, Zleceniodawca powinien jednak zwrócić Zleceniobiorcy wydatki, które ten poczynił w celu należytego wykonania zlecenia oraz część wynagrodzenia odpowiadającego jego dotychczasowym czynnościom, a jeżeli wypowiedzenie nastąpiło bez ważnego powodu, powinien także naprawić szkodę.</li>
@@ -298,7 +199,6 @@ ${v(clientName)}, zamieszkały(ą) przy ${v(clientAddress)}, legitymujący(a) si
   <li>Żadna ze Stron nie będzie odpowiedzialna względem drugiej Strony w przypadku, gdy do niewykonania umowy dojdzie na skutek okoliczności siły wyższej, zdarzeń losowych lub innych okoliczności niezależnych od woli którejkolwiek ze Stron.</li>
 </ol>
 
-<!-- §6 -->
 <p class="section-title">§ 6<br>Klauzula poufności</p>
 <ol>
   <li>Zleceniobiorca przetwarza dane osobowe Zleceniodawcy wyłącznie w zakresie niezbędnym do realizacji Umowy oraz zgodnie z obowiązującymi przepisami prawa, w tym RODO. Zleceniobiorca zapewnia stosowanie odpowiednich środków technicznych i organizacyjnych chroniących dane osobowe przed nieuprawnionym dostępem.</li>
@@ -310,7 +210,6 @@ ${v(clientName)}, zamieszkały(ą) przy ${v(clientAddress)}, legitymujący(a) si
   <li>W przypadku naruszenia zakazu, o którym mowa w niniejszym paragrafie, Zleceniodawca zobowiązany będzie do zapłaty kary umownej w wysokości 5.000 PLN (słownie: pięciu tysięcy złotych) za każde naruszenie.</li>
 </ol>
 
-<!-- §7 -->
 <p class="section-title">§ 7<br>Siła Wyższa</p>
 <ol>
   <li>Żadna ze Stron nie ponosi odpowiedzialności za opóźnienie lub niewykonanie Umowy w takim zakresie, w jakim zostało to spowodowane działaniem siły wyższej.</li>
@@ -318,13 +217,11 @@ ${v(clientName)}, zamieszkały(ą) przy ${v(clientAddress)}, legitymujący(a) si
   <li>W przypadku wystąpienia siły wyższej Strona, która uzyskała taką informację poinformuje niezwłocznie drugą Stronę o niemożności wykonania swoich zobowiązań wynikających z Umowy.</li>
 </ol>
 
-<!-- §8 -->
 <p class="section-title">§ 8<br>Reklamacje</p>
 <ol>
   <li>Wszelkie reklamacje dotyczące sposobu wykonywania Umowy powinny być składane na piśmie na adres e-mail <strong>biuro@twojadecyzja.online</strong> w terminie 14 dni od dnia zaistnienia zdarzenia stanowiącego podstawę reklamacji. Zleceniobiorca zobowiązuje się rozpatrzyć reklamację w terminie 30 dni od jej otrzymania.</li>
 </ol>
 
-<!-- §9 -->
 <p class="section-title">§ 9<br>Postanowienia końcowe</p>
 <ol start="2">
   <li>Umowa zastępuje wszelkie wcześniejsze czy istniejące ustalenia lub umowy, ustne czy pisemne, niezależnie od daty ich podjęcia czy zawarcia.</li>
@@ -343,7 +240,6 @@ ${v(clientName)}, zamieszkały(ą) przy ${v(clientAddress)}, legitymujący(a) si
   <li>W zakresie danych osobowych przetwarzanych na podstawie niniejszej Umowy zastosowanie znajdą przepisy dotyczące ochrony danych osobowych, w szczególności Rozporządzenie Parlamentu Europejskiego i Rady (UE) 2016/679 z dnia 27.04.2016 roku (RODO) oraz ustawa z dnia 10.05.2018 roku o ochronie danych osobowych.</li>
 </ol>
 
-<!-- SIGNATURES -->
 <div class="signatures">
   <div class="sig">
     <div class="sig-line">podpis Administratora<br><strong>TWOJA DECYZJA sp. z o.o.</strong></div>
@@ -353,7 +249,6 @@ ${v(clientName)}, zamieszkały(ą) przy ${v(clientAddress)}, legitymujący(a) si
   </div>
 </div>
 
-<!-- KLAUZULA INFORMACYJNA -->
 <div class="clause-info">
   <h2>Klauzula informacyjna</h2>
   <p>Na podstawie art. 13 ust. 1 i 2 Rozporządzenia Parlamentu Europejskiego i Rady (UE) 2016/679 z dnia 27 kwietnia 2016 r. (RODO), w związku z realizacją Umowy zlecenia nr ${v(contractNo)} z dnia ${v(dateStr)} o przygotowanie wniosku o wydanie zezwolenia na pobyt czasowy i reprezentowanie Pani/Pana w postępowaniu administracyjnym wywołanym złożeniem tego wniosku przed właściwym miejscowo Urzędem Wojewódzkim, informuję, że:</p>
@@ -371,7 +266,6 @@ ${v(clientName)}, zamieszkały(ą) przy ${v(clientAddress)}, legitymujący(a) si
   </ol>
 </div>
 
-<!-- CONSENT -->
 <div class="consent-block">
   <p style="text-align:center">
     ………………………………………………….&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;………………………………………………….
@@ -394,12 +288,90 @@ ${v(clientName)}, zamieszkały(ą) przy ${v(clientAddress)}, legitymujący(a) si
     <p style="font-weight:bold;margin-top:4px">${clientName}</p>
   </div>
 </div>
+</div></div>`
+}
 
-</div>
-</body>
-</html>`
+function ContractInner() {
+  const searchParams = useSearchParams()
+  const id = searchParams.get('id')
+  const [state, setState] = useState<
+    | { status: 'loading' }
+    | { status: 'notFound' }
+    | { status: 'missing'; html: string }
+    | { status: 'ready'; html: string; title: string }
+  >({ status: 'loading' })
 
-  return new NextResponse(html, {
-    headers: { 'Content-Type': 'text/html; charset=utf-8' },
-  })
+  useEffect(() => {
+    if (!id) {
+      setState({ status: 'notFound' })
+      return
+    }
+    ;(async () => {
+      const supabase = createClient()
+      const { data: deal } = await supabase
+        .from('deals')
+        .select('*')
+        .eq('id', id)
+        .single()
+      if (!deal) {
+        setState({ status: 'notFound' })
+        return
+      }
+      let contact: Contact | null = null
+      if (deal.contact_id) {
+        const { data } = await supabase
+          .from('contacts')
+          .select('*')
+          .eq('id', deal.contact_id)
+          .single()
+        contact = data as Contact | null
+      }
+      const { missing, isReady } = checkContractReadiness(deal as Deal, contact)
+      if (!isReady) {
+        setState({
+          status: 'missing',
+          html: renderMissingFieldsHtml(id, missing),
+        })
+        return
+      }
+      const html = buildContractHtml(id, deal as Deal, contact)
+      setState({ status: 'ready', html, title: `Umowa ${id}` })
+    })()
+  }, [id])
+
+  useEffect(() => {
+    if (state.status === 'ready') {
+      document.title = state.title
+    }
+  }, [state])
+
+  if (state.status === 'loading') {
+    return (
+      <div style={{ padding: 40, fontFamily: 'system-ui, sans-serif' }}>
+        Загрузка договора…
+      </div>
+    )
+  }
+  if (state.status === 'notFound') {
+    return (
+      <div style={{ padding: 40, fontFamily: 'system-ui, sans-serif' }}>
+        Сделка не найдена.
+      </div>
+    )
+  }
+  return <div dangerouslySetInnerHTML={{ __html: state.html }} />
+}
+
+export default function ContractPage() {
+  return (
+    <Suspense
+      fallback={
+        <div style={{ padding: 40, fontFamily: 'system-ui, sans-serif' }}>
+          Загрузка…
+        </div>
+      }
+    >
+      <ContractInner />
+    </Suspense>
+  )
 }

@@ -200,7 +200,7 @@ export function ContactDetail({ contact, deals, activities }: Props) {
               {openDeals.slice(0, 4).map(deal => (
                 <button
                   key={deal.id}
-                  onClick={() => router.push(`/deals/${deal.id}`)}
+                  onClick={() => router.push(`/deals/detail/?id=${deal.id}`)}
                   className="flex w-full items-center justify-between px-3 py-2.5 text-left border-t border-gray-100 hover:bg-gray-50 transition-colors"
                 >
                   <div className="min-w-0">
@@ -324,7 +324,7 @@ export function ContactDetail({ contact, deals, activities }: Props) {
               ) : deals.map(deal => (
                 <div
                   key={deal.id}
-                  onClick={() => router.push(`/deals/${deal.id}`)}
+                  onClick={() => router.push(`/deals/detail/?id=${deal.id}`)}
                   className="cursor-pointer rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-blue-300 hover:shadow-md transition-all"
                 >
                   <div className="flex items-start justify-between gap-3">

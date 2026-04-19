@@ -63,7 +63,7 @@ export function DealCard({ deal, onClick }: DealCardProps) {
 
   function handleClick() {
     if (onClick) onClick()
-    router.push(`/deals/${deal.id}`)
+    router.push(`/deals/detail/?id=${deal.id}`)
   }
 
   return (
