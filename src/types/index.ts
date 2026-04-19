@@ -86,6 +86,7 @@ export interface User {
 
 export interface Contact {
   id: string
+  number?: number
   type: ContactType
   // Personal info
   first_name: string
@@ -130,6 +131,7 @@ export interface Contact {
 
 export interface Lead {
   id: string
+  number?: number
   status: LeadStatus
   source: LeadSource
   // Contact info (can be linked to Contact)
@@ -156,6 +158,7 @@ export interface Lead {
 
 export interface Deal {
   id: string
+  number?: number
   title: string
   pipeline: DealPipeline
   stage: string

@@ -234,8 +234,8 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
           <div className="flex items-center gap-2">
             <span className="text-xs text-blue-500">{PIPELINE_LABELS[deal.pipeline]}</span>
             <ChevronDown className="h-3 w-3 text-gray-400" />
-            <span className="text-[10px] font-mono text-gray-400" title="Номер договора = ID сделки">
-              № {deal.id}
+            <span className="text-[10px] font-mono text-gray-400" title={`Номер сделки${deal.number ? ` (UUID: ${deal.id})` : ''}`}>
+              № {deal.number ?? deal.id}
             </span>
           </div>
         </div>

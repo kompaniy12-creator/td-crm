@@ -164,7 +164,7 @@ function LeadDetailInner({ lead, contact }: Props) {
           <h1 className="text-base font-semibold text-gray-900 truncate leading-tight">{fullName}</h1>
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500">{SOURCE_LABELS[lead.source] || lead.source}</span>
-            <span className="text-[10px] font-mono text-gray-400" title="ID лида">№ {lead.id}</span>
+            <span className="text-[10px] font-mono text-gray-400" title={`Номер лида${lead.number ? ` (UUID: ${lead.id})` : ''}`}>№ {lead.number ?? lead.id}</span>
           </div>
         </div>
 
