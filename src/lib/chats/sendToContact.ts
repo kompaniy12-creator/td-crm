@@ -114,7 +114,8 @@ export async function sendToContact(
     return { ok: true, threadId, messageId: msg!.id as string }
   }
 
-  // channel === 'telegram' — reuse most recent existing thread
+  // channel === 'telegram'
+  // 1. Prefer an existing thread (any telegram integration).
   const { data: thr } = await supabase
     .from('chat_threads')
     .select('id, channel, integration_id')
@@ -123,17 +124,51 @@ export async function sendToContact(
     .order('last_message_at', { ascending: false, nullsFirst: false })
     .limit(1)
     .maybeSingle()
-  if (!thr) {
-    return {
-      ok: false,
-      reason: contact.telegram
-        ? 'Чата в Telegram пока нет — клиент должен сначала написать вам сам (или нажмите «Открыть в Telegram»).'
-        : 'У контакта не указан Telegram.',
+
+  let threadId = thr?.id as string | undefined
+
+  // 2. Cold-start: no existing thread. Only possible via telegram_personal
+  //    (bots can't message users who haven't started the bot).
+  //    gramjs sendMessage(entity) accepts '@username' — so we store that as
+  //    external_thread_id and let the worker resolve the entity at send time.
+  if (!threadId) {
+    const username = (contact.telegram || '').trim().replace(/^@/, '')
+    if (!username) {
+      return { ok: false, reason: 'У контакта не указан Telegram (нужен @username).' }
     }
+    const { data: integ } = await supabase
+      .from('integrations')
+      .select('id, kind, status')
+      .eq('kind', 'telegram_personal')
+      .eq('status', 'active')
+      .limit(1)
+      .maybeSingle()
+    if (!integ) {
+      return {
+        ok: false,
+        reason: 'Чтобы писать первым в Telegram, подключите личный Telegram-аккаунт в «Настройки → Интеграции» (бот не может писать первым).',
+      }
+    }
+    const externalThreadId = `@${username}`
+    const { data: created, error: cErr } = await supabase
+      .from('chat_threads')
+      .insert({
+        integration_id: integ.id,
+        channel: 'telegram_personal',
+        external_thread_id: externalThreadId,
+        contact_id: contact.id,
+        deal_id: opts.dealId ?? null,
+        lead_id: opts.leadId ?? null,
+        title: username,
+      })
+      .select('id')
+      .single()
+    if (cErr || !created) return { ok: false, reason: cErr?.message || 'Не удалось создать чат' }
+    threadId = created.id as string
   }
 
   const { data: msg, error: mErr } = await supabase.from('chat_messages').insert({
-    thread_id: thr.id,
+    thread_id: threadId,
     direction: 'outbound',
     body,
     sender_user_id: opts.senderUserId,
@@ -142,5 +177,5 @@ export async function sendToContact(
   }).select('id').single()
   if (mErr) return { ok: false, reason: mErr.message }
 
-  return { ok: true, threadId: thr.id as string, messageId: msg!.id as string }
+  return { ok: true, threadId, messageId: msg!.id as string }
 }

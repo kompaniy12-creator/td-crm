@@ -135,9 +135,20 @@ async function onMessage(it: Integration, event: NewMessageEvent) {
     phone: sender?.phone ? `+${sender.phone}` : undefined,
     displayName: [sender?.firstName, sender?.lastName].filter(Boolean).join(' ') || sender?.username,
   })
+  const chatIdStr = String(msg.chatId || msg.peerId)
+  // If we previously cold-started a thread with external_thread_id='@username'
+  // (from a CRM "write first" send), migrate it to the numeric chat id so the
+  // conversation stays in a single thread.
+  if (sender?.username) {
+    await supabase
+      .from('chat_threads')
+      .update({ external_thread_id: chatIdStr, contact_id: contactId || null })
+      .eq('integration_id', it.id)
+      .eq('external_thread_id', `@${sender.username}`)
+  }
   const threadId = await upsertThread({ channel: it.kind,
     integrationId: it.id,
-    externalThreadId: String(msg.chatId || msg.peerId),
+    externalThreadId: chatIdStr,
     contactId,
     title: sender?.username || undefined,
   })
