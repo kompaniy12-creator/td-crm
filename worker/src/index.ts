@@ -58,23 +58,21 @@ async function tick() {
       }
 
       // Google Calendar: incremental sync every 60s + outbound drain every 15s.
-      if (it.kind === 'google_calendar') {
-        if (it.status === 'connecting') {
-          await pollGoogleCalendar(it)
-          running.set(it.id, { kind: 'google_calendar', lastCalPoll: Date.now() })
-        } else if (it.status === 'active') {
-          const r = running.get(it.id) || { kind: 'google_calendar' }
-          const now = Date.now()
-          if (!r.lastCalDrain || now - r.lastCalDrain > 15_000) {
-            await drainGoogleCalendarOutbound(it)
-            r.lastCalDrain = now
-          }
-          if (!r.lastCalPoll || now - r.lastCalPoll > 60_000) {
-            await pollGoogleCalendar(it)
-            r.lastCalPoll = now
-          }
-          running.set(it.id, r)
+      // Note: during 'connecting' startChannel() already triggered pollGoogleCalendar
+      // (which exchanges the oauth_code); don't call it again in this tick or we'd
+      // reuse the now-consumed code and get invalid_grant.
+      if (it.kind === 'google_calendar' && it.status === 'active') {
+        const r = running.get(it.id) || { kind: 'google_calendar' }
+        const now = Date.now()
+        if (!r.lastCalDrain || now - r.lastCalDrain > 15_000) {
+          await drainGoogleCalendarOutbound(it)
+          r.lastCalDrain = now
         }
+        if (!r.lastCalPoll || now - r.lastCalPoll > 60_000) {
+          await pollGoogleCalendar(it)
+          r.lastCalPoll = now
+        }
+        running.set(it.id, r)
       }
 
       // Drive in-progress Telegram OTP flow.

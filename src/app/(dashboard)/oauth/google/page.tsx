@@ -37,6 +37,8 @@ function Inner() {
             oauth_code: code,
             received_at: new Date().toISOString(),
           },
+          status: 'connecting',
+          last_error: null,
         })
         .eq('id', state)
       if (upErr) {
