@@ -17,13 +17,14 @@ export function useUnreadChats(): number {
     let cancelled = false
 
     async function recount() {
-      const { data } = await supabase
+      // Count threads that have at least one unread message, not the sum
+      // of unread messages across all threads.
+      const { count } = await supabase
         .from('chat_threads')
-        .select('unread_count')
+        .select('id', { count: 'exact', head: true })
         .gt('unread_count', 0)
       if (cancelled) return
-      const sum = (data || []).reduce((s, r: { unread_count: number | null }) => s + (r.unread_count || 0), 0)
-      setTotal(sum)
+      setTotal(count || 0)
     }
 
     recount()
