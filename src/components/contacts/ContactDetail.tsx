@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Contact, Deal, Activity } from '@/types'
 import { PIPELINE_LABELS } from '@/types'
 import { formatDate, formatMoney, getInitials } from '@/lib/utils/format'
+import { ContactChats } from './ContactChats'
 
 function avatarColor(name: string) {
   const colors = [
@@ -60,7 +61,7 @@ interface Props {
 
 export function ContactDetail({ contact, deals, activities }: Props) {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'general' | 'deals' | 'history'>('general')
+  const [activeTab, setActiveTab] = useState<'general' | 'deals' | 'chats' | 'history'>('general')
   const [note, setNote] = useState('')
 
   const fullName = [contact.first_name, contact.last_name, contact.middle_name].filter(Boolean).join(' ')
@@ -160,6 +161,7 @@ export function ContactDetail({ contact, deals, activities }: Props) {
         {([
           { key: 'general', label: 'Общие' },
           { key: 'deals', label: `Сделки (${deals.length})` },
+          { key: 'chats', label: 'Чаты' },
           { key: 'history', label: 'История' },
         ] as const).map(({ key, label }) => (
           <button
@@ -344,6 +346,12 @@ export function ContactDetail({ contact, deals, activities }: Props) {
                   <div className="mt-2 text-xs text-gray-400">{formatDate(deal.created_at)}</div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {activeTab === 'chats' && (
+            <div className="h-[calc(100vh-14rem)]">
+              <ContactChats contactId={contact.id} />
             </div>
           )}
 

@@ -27,7 +27,7 @@ const navItems = [
   { href: '/clients', icon: UserCheck, label: 'Клиенты' },
   { href: '/tasks', icon: CheckSquare, label: 'Задачи' },
   { href: '/calendar', icon: Calendar, label: 'Календарь' },
-  { href: '/communications', icon: MessageSquare, label: 'Коммуникации' },
+  { href: '/chats', icon: MessageSquare, label: 'Чаты' },
   { href: '/settings', icon: Settings, label: 'Настройки' },
 ]
 

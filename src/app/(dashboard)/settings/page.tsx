@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Image as ImageIcon, LogOut, User } from 'lucide-react'
+import Link from 'next/link'
+import { Check, Image as ImageIcon, LogOut, Plug, User } from 'lucide-react'
 import { useUIStore } from '@/lib/store/ui.store'
 import { BACKGROUNDS, findBackground, getActiveTheme } from '@/lib/backgrounds'
 import { createClient } from '@/lib/supabase/client'
@@ -230,7 +231,20 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      {/* TODO: интеграции, уведомления */}
+      <section className="rounded-xl border border-gray-200 bg-white p-5">
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900">
+          <Plug className="h-4 w-4" /> Интеграции
+        </h2>
+        <p className="mb-3 text-xs text-gray-500">
+          Подключайте мессенджеры (Telegram, WhatsApp, Instagram, Email…) — сообщения от клиентов будут приходить в модуль «Чаты».
+        </p>
+        <Link
+          href="/settings/integrations"
+          className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+        >
+          Открыть интеграции →
+        </Link>
+      </section>
     </div>
   )
 }
