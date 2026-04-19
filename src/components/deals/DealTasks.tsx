@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { CheckSquare, Plus, Check, Circle, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
+import { CreateTaskModal } from '@/components/tasks/CreateTaskModal'
+import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
 
 interface Task {
   id: string
@@ -39,12 +41,8 @@ export function DealTasks({ dealId, contactId }: Props) {
   const { user } = useCurrentUser()
   const [items, setItems] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
-  const [adding, setAdding] = useState(false)
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [priority, setPriority] = useState<Task['priority']>('medium')
-  const [dueDate, setDueDate] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [showCreate, setShowCreate] = useState(false)
+  const [detailId, setDetailId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const supabase = createClient()
@@ -60,28 +58,8 @@ export function DealTasks({ dealId, contactId }: Props) {
 
   useEffect(() => { load() }, [load])
 
-  async function createTask() {
-    if (!title.trim() || !user) return
-    setSaving(true)
-    const supabase = createClient()
-    await supabase.from('tasks').insert({
-      title: title.trim(),
-      description: description.trim() || null,
-      status: 'todo',
-      priority,
-      due_date: dueDate ? new Date(dueDate).toISOString() : null,
-      deal_id: dealId,
-      contact_id: contactId,
-      created_by: user.id,
-      assigned_to: user.id,
-    })
-    setTitle(''); setDescription(''); setPriority('medium'); setDueDate('')
-    setAdding(false)
-    await load()
-    setSaving(false)
-  }
-
-  async function toggleDone(task: Task) {
+  async function toggleDone(task: Task, e: React.MouseEvent) {
+    e.stopPropagation()
     const supabase = createClient()
     const done = task.status === 'done'
     await supabase.from('tasks').update({
@@ -91,7 +69,8 @@ export function DealTasks({ dealId, contactId }: Props) {
     await load()
   }
 
-  async function remove(task: Task) {
+  async function remove(task: Task, e: React.MouseEvent) {
+    e.stopPropagation()
     if (!confirm(`Удалить задачу «${task.title}»?`)) return
     const supabase = createClient()
     await supabase.from('tasks').delete().eq('id', task.id)
@@ -113,64 +92,12 @@ export function DealTasks({ dealId, contactId }: Props) {
           )}
         </div>
         <button
-          onClick={() => setAdding((a) => !a)}
+          onClick={() => setShowCreate(true)}
           className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-blue-600 hover:bg-blue-50"
         >
           <Plus className="h-3 w-3" /> добавить
         </button>
       </div>
-
-      {adding && (
-        <div className="mb-2 rounded-lg border border-blue-200 bg-blue-50/40 p-2 space-y-2">
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Что нужно сделать"
-            className="w-full rounded border border-gray-200 px-2 py-1 text-sm"
-          />
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Описание (необязательно)"
-            rows={2}
-            className="w-full rounded border border-gray-200 px-2 py-1 text-sm"
-          />
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-[10px] text-gray-500 mb-0.5">Срок</label>
-              <input
-                type="datetime-local"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="w-full rounded border border-gray-200 px-2 py-1 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] text-gray-500 mb-0.5">Приоритет</label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as Task['priority'])}
-                className="w-full rounded border border-gray-200 px-2 py-1 text-sm bg-white"
-              >
-                {(Object.keys(PRIORITY_LABELS) as Task['priority'][]).map((p) => (
-                  <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={() => setAdding(false)}
-              className="rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
-            >Отмена</button>
-            <button
-              onClick={createTask}
-              disabled={saving || !title.trim() || !user}
-              className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-            >{saving ? 'Сохраняю…' : 'Создать'}</button>
-          </div>
-        </div>
-      )}
 
       {loading ? (
         <div className="py-2 text-center text-xs text-gray-400">Загрузка…</div>
@@ -184,7 +111,8 @@ export function DealTasks({ dealId, contactId }: Props) {
             return (
               <div
                 key={t.id}
-                className={`rounded-md border px-2 py-1.5 text-xs ${
+                onClick={() => setDetailId(t.id)}
+                className={`cursor-pointer rounded-md border px-2 py-1.5 text-xs transition-colors hover:border-blue-300 ${
                   done
                     ? 'border-gray-100 bg-gray-50'
                     : overdue
@@ -194,7 +122,7 @@ export function DealTasks({ dealId, contactId }: Props) {
               >
                 <div className="flex items-start gap-2">
                   <button
-                    onClick={() => toggleDone(t)}
+                    onClick={(e) => toggleDone(t, e)}
                     className={`mt-0.5 flex-shrink-0 ${done ? 'text-green-600' : 'text-gray-400 hover:text-blue-600'}`}
                     title={done ? 'Снять отметку' : 'Отметить выполненной'}
                   >
@@ -205,7 +133,7 @@ export function DealTasks({ dealId, contactId }: Props) {
                       {t.title}
                     </div>
                     {t.description && !done && (
-                      <div className="mt-0.5 text-[11px] text-gray-500">{t.description}</div>
+                      <div className="mt-0.5 text-[11px] text-gray-500 line-clamp-1">{t.description}</div>
                     )}
                     <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-gray-500">
                       <span className={`rounded px-1.5 py-0.5 font-medium ${PRIORITY_COLORS[t.priority]}`}>
@@ -222,7 +150,7 @@ export function DealTasks({ dealId, contactId }: Props) {
                   </div>
                   {(t.created_by === user?.id || user?.role === 'admin') && (
                     <button
-                      onClick={() => remove(t)}
+                      onClick={(e) => remove(t, e)}
                       title="Удалить"
                       className="flex-shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
                     ><Trash2 className="h-3 w-3" /></button>
@@ -232,6 +160,23 @@ export function DealTasks({ dealId, contactId }: Props) {
             )
           })}
         </div>
+      )}
+
+      <CreateTaskModal
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        onCreated={(id) => { load(); setDetailId(id) }}
+        defaultDealId={dealId}
+        defaultContactId={contactId}
+      />
+
+      {detailId && (
+        <TaskDetailModal
+          taskId={detailId}
+          open={!!detailId}
+          onClose={() => setDetailId(null)}
+          onChanged={load}
+        />
       )}
     </div>
   )

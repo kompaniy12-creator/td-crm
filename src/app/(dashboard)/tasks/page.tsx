@@ -1,203 +1,371 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { CheckSquare, Clock, AlertCircle, CheckCircle2, Plus, RefreshCw } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  CheckSquare, Plus, RefreshCw, LayoutGrid, List, Calendar as CalendarIcon,
+  Clock, AlertTriangle, ChevronDown, ChevronRight,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Avatar } from '@/components/ui/avatar'
 import { createClient } from '@/lib/supabase/client'
-import { formatDate } from '@/lib/utils/format'
-import type { Task } from '@/types'
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
+import {
+  TaskRow, UserLite, PRIORITY_LABEL, PRIORITY_CHIP,
+  BUCKET_META, BUCKET_ORDER, bucketForDue, userName, initials,
+} from '@/components/tasks/shared'
+import { CreateTaskModal } from '@/components/tasks/CreateTaskModal'
+import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
 
-const PRIORITY_CONFIG = {
-  low: { label: 'Низкий', variant: 'secondary' as const, color: 'text-gray-500' },
-  medium: { label: 'Средний', variant: 'default' as const, color: 'text-blue-600' },
-  high: { label: 'Высокий', variant: 'warning' as const, color: 'text-orange-600' },
-  urgent: { label: 'Срочно', variant: 'destructive' as const, color: 'text-red-600' },
-}
-
-const STATUS_CONFIG = {
-  todo: { label: 'К выполнению', icon: <Clock className="h-4 w-4 text-gray-500" /> },
-  in_progress: { label: 'В работе', icon: <AlertCircle className="h-4 w-4 text-blue-500" /> },
-  done: { label: 'Выполнено', icon: <CheckCircle2 className="h-4 w-4 text-green-500" /> },
-  cancelled: { label: 'Отменено', icon: <CheckSquare className="h-4 w-4 text-gray-400" /> },
-}
+type Scope = 'my' | 'created' | 'watching' | 'all'
+type View = 'list' | 'board' | 'plan' | 'calendar'
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState<string>('todo,in_progress')
-  const [priorityFilter, setPriorityFilter] = useState<string>('all')
+  const { user } = useCurrentUser()
+  const [tasks, setTasks] = useState<TaskRow[]>([])
+  const [users, setUsers] = useState<UserLite[]>([])
+  const [loading, setLoading] = useState(true)
+  const [scope, setScope] = useState<Scope>('my')
+  const [view, setView] = useState<View>('board')
+  const [showCreate, setShowCreate] = useState(false)
+  const [detailId, setDetailId] = useState<string | null>(null)
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({ done: true, later: true })
 
-  const fetchTasks = useCallback(async () => {
-    setIsLoading(true)
+  const load = useCallback(async () => {
+    setLoading(true)
     const supabase = createClient()
-    let query = supabase.from('tasks').select('*').order('due_date', { ascending: true, nullsFirst: false })
+    const [{ data: tRows }, { data: uRows }] = await Promise.all([
+      supabase.from('tasks').select('*').order('due_date', { ascending: true, nullsFirst: false }),
+      supabase.from('users').select('id, email, full_name, avatar_url'),
+    ])
+    setTasks((tRows as TaskRow[]) || [])
+    setUsers((uRows as UserLite[]) || [])
+    setLoading(false)
+  }, [])
 
-    if (statusFilter !== 'all') {
-      const statuses = statusFilter.split(',')
-      query = query.in('status', statuses)
+  useEffect(() => { load() }, [load])
+
+  const usersMap = useMemo(() => {
+    const m = new Map<string, UserLite>()
+    users.forEach((u) => m.set(u.id, u))
+    return m
+  }, [users])
+
+  const filteredTasks = useMemo(() => {
+    if (!user) return []
+    const me = user.id
+    switch (scope) {
+      case 'my': return tasks.filter((t) => t.assigned_to === me || t.co_assignees?.includes(me))
+      case 'created': return tasks.filter((t) => t.created_by === me)
+      case 'watching': return tasks.filter((t) => t.watchers?.includes(me))
+      case 'all':
+      default: return tasks
     }
-    if (priorityFilter !== 'all') {
-      query = query.eq('priority', priorityFilter)
-    }
+  }, [tasks, scope, user])
 
-    const { data } = await query
-    setTasks((data as Task[]) || [])
-    setIsLoading(false)
-  }, [statusFilter, priorityFilter])
+  const groups = useMemo(() => {
+    const g: Record<string, TaskRow[]> = {}
+    BUCKET_ORDER.forEach((b) => { g[b] = [] })
+    filteredTasks.forEach((t) => {
+      const bucket = bucketForDue(t)
+      g[bucket].push(t)
+    })
+    return g
+  }, [filteredTasks])
 
-  useEffect(() => {
-    fetchTasks()
-  }, [fetchTasks])
+  const stats = useMemo(() => {
+    const active = filteredTasks.filter((t) => t.status !== 'done' && t.status !== 'cancelled')
+    const overdue = active.filter((t) => t.due_date && new Date(t.due_date) < new Date()).length
+    const today = active.filter((t) => bucketForDue(t) === 'today').length
+    const inProgress = active.filter((t) => t.status === 'in_progress').length
+    const done = filteredTasks.filter((t) => t.status === 'done').length
+    return { active: active.length, overdue, today, inProgress, done }
+  }, [filteredTasks])
 
-  const toggleTaskStatus = async (task: Task) => {
+  async function quickComplete(task: TaskRow) {
     const supabase = createClient()
-    const newStatus: 'todo' | 'done' = task.status === 'done' ? 'todo' : 'done'
+    const done = task.status === 'done'
     await supabase.from('tasks').update({
-      status: newStatus,
-      completed_at: newStatus === 'done' ? new Date().toISOString() : null,
+      status: done ? 'todo' : 'done',
+      completed_at: done ? null : new Date().toISOString(),
     }).eq('id', task.id)
-    fetchTasks()
+    load()
   }
 
-  const isOverdue = (task: Task) => {
-    if (!task.due_date || task.status === 'done' || task.status === 'cancelled') return false
-    return new Date(task.due_date) < new Date()
-  }
-
-  const stats = {
-    todo: tasks.filter(t => t.status === 'todo').length,
-    inProgress: tasks.filter(t => t.status === 'in_progress').length,
-    urgent: tasks.filter(t => t.priority === 'urgent').length,
-    overdue: tasks.filter(t => isOverdue(t)).length,
-  }
+  const toggleCollapsed = (key: string) => setCollapsed((c) => ({ ...c, [key]: !c[key] }))
 
   return (
     <div className="flex h-full flex-col">
-      {/* Stats */}
-      <div className="flex items-center gap-6 border-b border-white/15 bg-white/10 px-6 py-3 shadow-sm group-data-[theme=dark]/theme:bg-slate-900/10 group-data-[theme=dark]/theme:border-white/10 group-data-[theme=dark]/theme:text-gray-100">
-        <Stat label="К выполнению" value={stats.todo} color="text-gray-700" />
+      {/* Stats bar */}
+      <div className="flex items-center gap-5 border-b border-white/15 bg-white/10 px-6 py-3 shadow-sm">
+        <Stat label="Активные" value={stats.active} color="text-gray-800" />
         <Stat label="В работе" value={stats.inProgress} color="text-blue-600" />
-        <Stat label="Срочно" value={stats.urgent} color="text-red-600" />
-        {stats.overdue > 0 && <Stat label="Просрочено" value={stats.overdue} color="text-red-700" />}
+        <Stat label="На сегодня" value={stats.today} color="text-orange-600" />
+        <Stat label="Просрочено" value={stats.overdue} color="text-red-600" />
+        <Stat label="Выполнено" value={stats.done} color="text-green-600" />
         <div className="flex-1" />
-        <Button size="sm" variant="ghost" onClick={fetchTasks}>
+        <Button size="sm" variant="ghost" onClick={load} title="Обновить">
           <RefreshCw className="h-4 w-4" />
+        </Button>
+        <Button size="sm" onClick={() => setShowCreate(true)}>
+          <Plus className="mr-1 h-4 w-4" /> Добавить задачу
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-3 border-b border-white/15 bg-white/60 px-6 py-2 group-data-[theme=dark]/theme:bg-slate-900/50 group-data-[theme=dark]/theme:border-white/10 group-data-[theme=dark]/theme:text-gray-100">
-        <div className="flex rounded-md border border-gray-200 overflow-hidden">
-          {[
-            { value: 'todo,in_progress', label: 'Активные' },
-            { value: 'all', label: 'Все' },
-            { value: 'done', label: 'Выполненные' },
-          ].map((opt) => (
+      {/* Toolbar: scope + view */}
+      <div className="flex flex-wrap items-center gap-3 border-b border-white/15 bg-white/60 px-6 py-2">
+        <div className="flex rounded-md border border-gray-200 overflow-hidden bg-white">
+          {([
+            { v: 'my', label: 'Я исполнитель' },
+            { v: 'created', label: 'Я постановщик' },
+            { v: 'watching', label: 'Я наблюдатель' },
+            { v: 'all', label: 'Все' },
+          ] as { v: Scope; label: string }[]).map((s) => (
             <button
-              key={opt.value}
-              onClick={() => setStatusFilter(opt.value)}
+              key={s.v}
+              onClick={() => setScope(s.v)}
               className={`px-3 py-1.5 text-sm transition-colors ${
-                statusFilter === opt.value ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                scope === s.v ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
-            >
-              {opt.label}
-            </button>
+            >{s.label}</button>
           ))}
         </div>
 
-        <select
-          value={priorityFilter}
-          onChange={(e) => setPriorityFilter(e.target.value)}
-          className="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700"
-        >
-          <option value="all">Все приоритеты</option>
-          <option value="urgent">Срочно</option>
-          <option value="high">Высокий</option>
-          <option value="medium">Средний</option>
-          <option value="low">Низкий</option>
-        </select>
+        <div className="flex-1" />
+
+        <div className="flex rounded-md border border-gray-200 overflow-hidden bg-white">
+          <ViewBtn active={view === 'list'} onClick={() => setView('list')} icon={<List className="h-4 w-4" />} label="Список" />
+          <ViewBtn active={view === 'board'} onClick={() => setView('board')} icon={<LayoutGrid className="h-4 w-4" />} label="Сроки" />
+          <ViewBtn active={view === 'plan'} onClick={() => setView('plan')} icon={<CheckSquare className="h-4 w-4" />} label="Мой план" />
+          <ViewBtn active={view === 'calendar'} onClick={() => setView('calendar')} icon={<CalendarIcon className="h-4 w-4" />} label="Календарь" />
+        </div>
       </div>
 
-      {/* Task list */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {isLoading ? (
+      {/* Main content */}
+      <div className="flex-1 overflow-auto p-4">
+        {loading ? (
           <div className="flex h-40 items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
           </div>
-        ) : tasks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <CheckSquare className="h-12 w-12 text-gray-300 mb-3" />
-            <p className="text-gray-500">Задачи не найдены</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {tasks.map((task) => {
-              const priority = PRIORITY_CONFIG[task.priority]
-              const overdueTask = isOverdue(task)
+        ) : view === 'board' ? (
+          <div className="space-y-3">
+            {BUCKET_ORDER.map((bucket) => {
+              const items = groups[bucket] || []
+              if (items.length === 0) return null
+              const meta = BUCKET_META[bucket]
+              const isCollapsed = collapsed[bucket]
               return (
-                <div
-                  key={task.id}
-                  className={`flex items-start gap-4 rounded-lg border bg-white p-4 transition-all ${
-                    overdueTask ? 'border-red-200 bg-red-50' : 'border-gray-200'
-                  }`}
-                >
-                  {/* Checkbox */}
+                <div key={bucket} className="rounded-lg border border-gray-200 bg-white shadow-sm">
                   <button
-                    onClick={() => toggleTaskStatus(task)}
-                    className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-2 transition-colors ${
-                      task.status === 'done'
-                        ? 'border-green-500 bg-green-500 text-white'
-                        : 'border-gray-300 hover:border-blue-400'
-                    }`}
+                    onClick={() => toggleCollapsed(bucket)}
+                    className={`flex w-full items-center gap-2 border-l-4 ${meta.accent} px-4 py-2.5 text-left hover:bg-gray-50`}
                   >
-                    {task.status === 'done' && (
-                      <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
-                        <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
+                    {isCollapsed ? <ChevronRight className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+                    <span className="font-semibold text-gray-800">{meta.title}</span>
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
+                      {items.length}
+                    </span>
+                    {bucket === 'overdue' && items.length > 0 && (
+                      <AlertTriangle className="h-4 w-4 text-red-500" />
                     )}
                   </button>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium ${task.status === 'done' ? 'line-through text-gray-400' : 'text-gray-900'}`}>
-                      {task.title}
-                    </p>
-                    {task.description && (
-                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{task.description}</p>
-                    )}
-                    <div className="flex items-center gap-3 mt-2">
-                      <Badge variant={priority.variant}>{priority.label}</Badge>
-                      {task.due_date && (
-                        <span className={`flex items-center gap-1 text-xs ${overdueTask ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
-                          <Clock className="h-3 w-3" />
-                          {formatDate(task.due_date)}
-                          {overdueTask && ' (просрочено)'}
-                        </span>
-                      )}
+                  {!isCollapsed && (
+                    <div className="divide-y divide-gray-100 border-t border-gray-100">
+                      {items.map((t) => (
+                        <TaskRowLine
+                          key={t.id}
+                          task={t}
+                          usersMap={usersMap}
+                          onOpen={() => setDetailId(t.id)}
+                          onQuickComplete={() => quickComplete(t)}
+                        />
+                      ))}
                     </div>
-                  </div>
-
-                  {/* Status icon */}
-                  <div className="flex-shrink-0">
-                    {STATUS_CONFIG[task.status]?.icon}
-                  </div>
+                  )}
                 </div>
               )
             })}
+            {filteredTasks.length === 0 && <EmptyState onCreate={() => setShowCreate(true)} />}
           </div>
+        ) : view === 'list' ? (
+          <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+            {filteredTasks.length === 0 ? (
+              <EmptyState onCreate={() => setShowCreate(true)} />
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {filteredTasks.map((t) => (
+                  <TaskRowLine
+                    key={t.id}
+                    task={t}
+                    usersMap={usersMap}
+                    onOpen={() => setDetailId(t.id)}
+                    onQuickComplete={() => quickComplete(t)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : view === 'plan' ? (
+          <MyPlanView tasks={filteredTasks} usersMap={usersMap} onOpen={setDetailId} onQuickComplete={quickComplete} />
+        ) : (
+          <CalendarStub />
         )}
       </div>
+
+      <CreateTaskModal
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        onCreated={(id) => { load(); setDetailId(id) }}
+      />
+
+      {detailId && (
+        <TaskDetailModal
+          taskId={detailId}
+          open={!!detailId}
+          onClose={() => setDetailId(null)}
+          onChanged={load}
+        />
+      )}
     </div>
   )
 }
 
-function Stat({ label, value, color = 'text-gray-900' }: { label: string; value: number; color?: string }) {
+function Stat({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-sm text-gray-500 group-data-[theme=dark]/theme:text-gray-300">{label}:</span>
-      <span className={`text-sm font-semibold ${color} group-data-[theme=dark]/theme:text-gray-100`}>{value}</span>
+      <span className="text-sm text-gray-500">{label}:</span>
+      <span className={`text-sm font-semibold ${color}`}>{value}</span>
     </div>
   )
+}
+
+function ViewBtn({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors ${
+        active ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+      }`}
+    >
+      {icon}{label}
+    </button>
+  )
+}
+
+function TaskRowLine({ task, usersMap, onOpen, onQuickComplete }: {
+  task: TaskRow
+  usersMap: Map<string, UserLite>
+  onOpen: () => void
+  onQuickComplete: () => void
+}) {
+  const done = task.status === 'done' || task.status === 'cancelled'
+  const overdue = !done && task.due_date && new Date(task.due_date) < new Date()
+  const assignee = task.assigned_to ? usersMap.get(task.assigned_to) : null
+  return (
+    <div
+      onClick={onOpen}
+      className={`group flex cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-blue-50/50 ${overdue ? 'bg-red-50/30' : ''}`}
+    >
+      <button
+        onClick={(e) => { e.stopPropagation(); onQuickComplete() }}
+        className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-2 ${
+          done ? 'border-green-500 bg-green-500 text-white' : 'border-gray-300 hover:border-blue-400'
+        }`}
+      >
+        {done && (
+          <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
+            <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+      </button>
+
+      <div className="min-w-0 flex-1">
+        <div className={`truncate text-sm font-medium ${done ? 'line-through text-gray-400' : 'text-gray-900'}`}>
+          {task.title}
+        </div>
+        {task.description && !done && (
+          <div className="mt-0.5 truncate text-xs text-gray-500">{task.description}</div>
+        )}
+      </div>
+
+      <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${PRIORITY_CHIP[task.priority]}`}>
+        {PRIORITY_LABEL[task.priority]}
+      </span>
+
+      {task.due_date && (
+        <span className={`hidden md:flex items-center gap-1 text-xs ${overdue ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
+          <Clock className="h-3 w-3" />
+          {formatShort(task.due_date)}
+        </span>
+      )}
+
+      {assignee && (
+        <span title={userName(assignee)} className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
+          {initials(assignee)}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function MyPlanView({ tasks, usersMap, onOpen, onQuickComplete }: {
+  tasks: TaskRow[]
+  usersMap: Map<string, UserLite>
+  onOpen: (id: string) => void
+  onQuickComplete: (t: TaskRow) => void
+}) {
+  const { user } = useCurrentUser()
+  const mine = tasks.filter((t) => t.assigned_to === user?.id && t.status !== 'done' && t.status !== 'cancelled')
+  const byBucket: Record<string, TaskRow[]> = {}
+  BUCKET_ORDER.forEach((b) => { byBucket[b] = [] })
+  mine.forEach((t) => { byBucket[bucketForDue(t)].push(t) })
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      {['overdue', 'today', 'week'].map((b) => (
+        <div key={b} className="rounded-lg border border-gray-200 bg-white shadow-sm">
+          <div className={`border-l-4 ${BUCKET_META[b].accent} px-3 py-2 font-semibold text-gray-800`}>
+            {BUCKET_META[b].title} <span className="ml-1 text-xs text-gray-500">({byBucket[b].length})</span>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {byBucket[b].length === 0 && (
+              <div className="px-3 py-4 text-center text-xs text-gray-400">Пусто</div>
+            )}
+            {byBucket[b].map((t) => (
+              <TaskRowLine
+                key={t.id}
+                task={t}
+                usersMap={usersMap}
+                onOpen={() => onOpen(t.id)}
+                onQuickComplete={() => onQuickComplete(t)}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function CalendarStub() {
+  return (
+    <div className="flex h-60 flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 text-center">
+      <CalendarIcon className="mb-2 h-10 w-10 text-gray-300" />
+      <div className="text-gray-500">Календарь задач</div>
+      <div className="mt-1 text-xs text-gray-400">Вид в разработке — используйте «Сроки» или «Список»</div>
+    </div>
+  )
+}
+
+function EmptyState({ onCreate }: { onCreate: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-14 text-center">
+      <CheckSquare className="mb-3 h-12 w-12 text-gray-300" />
+      <p className="mb-3 text-gray-500">Задач нет — самое время добавить первую</p>
+      <Button onClick={onCreate}><Plus className="mr-1 h-4 w-4" /> Добавить задачу</Button>
+    </div>
+  )
+}
+
+function formatShort(iso: string): string {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(d.getDate())}.${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
