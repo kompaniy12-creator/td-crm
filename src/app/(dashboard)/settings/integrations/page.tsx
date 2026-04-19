@@ -9,6 +9,7 @@ import {
   type ChannelSpec, type Integration,
 } from '@/lib/chats/types'
 import { ConnectModal } from '@/components/integrations/ConnectModal'
+import { OAuthAppsSection } from '@/components/integrations/OAuthAppsSection'
 
 export default function IntegrationsPage() {
   const { user, loading: userLoading } = useCurrentUser()
@@ -154,6 +155,8 @@ export default function IntegrationsPage() {
           ))}
         </div>
       </section>
+
+      <OAuthAppsSection />
 
       {adding && (
         <ConnectModal

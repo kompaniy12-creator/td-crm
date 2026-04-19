@@ -103,11 +103,21 @@ export interface CredentialField {
 }
 
 export interface OAuthSpec {
-  provider: 'google'
+  provider: 'google' | 'facebook' | 'instagram'
   authEndpoint: string
   scopes: string[]
-  clientIdEnv: string
+  /**
+   * Optional env fallback for the public client_id. Preferred source is the
+   * `oauth_apps` table (fetched via RPC get_oauth_app_public). Leave empty
+   * when the admin is expected to configure the app from within the CRM.
+   */
+  clientIdEnv?: string
   redirectPath: string
+  /**
+   * Extra params to append to the authorize URL (e.g. `response_type`,
+   * `prompt`, facebook's `display`).
+   */
+  extraParams?: Record<string, string>
 }
 
 export interface ChannelSpec {
@@ -173,34 +183,46 @@ export const CHANNEL_SPECS: ChannelSpec[] = [
 
   // ── Meta (Facebook / Instagram) ─────────────────────────────
   {
-    kind: 'instagram',
-    label: 'Instagram Direct',
-    tagline: 'Логин + пароль',
-    description:
-      'Войдите учёткой Instagram — сообщения Direct попадают в CRM.',
-    flow: 'form',
-    credentialFields: [
-      { name: 'username', label: 'Username или Email', required: true },
-      { name: 'password', label: 'Пароль', type: 'password', required: true },
-      { name: 'two_factor_code', label: '2FA-код (если включён)', placeholder: 'опционально' },
-    ],
-    warning:
-      'Meta запрещает автоматический логин по паролю. Аккаунт может быть заблокирован. Для продакшена используйте Graph API + OAuth через facebook.com.',
-  },
-  {
     kind: 'facebook_messenger',
     label: 'Facebook Messenger',
-    tagline: 'Логин + пароль',
+    tagline: 'Войти через Facebook',
     description:
-      'Сообщения Facebook Page Messenger через вашу учётку.',
-    flow: 'form',
-    credentialFields: [
-      { name: 'email', label: 'Email', type: 'email', required: true },
-      { name: 'password', label: 'Пароль', type: 'password', required: true },
-      { name: 'page_id', label: 'ID страницы (если управляете несколькими)' },
-    ],
-    warning:
-      'Meta запрещает автоматический логин по паролю. Рекомендуем Graph API + OAuth.',
+      'Официальный Facebook Login: выбираете страницу, CRM получает токен и читает/отправляет сообщения Messenger через Graph API.',
+    flow: 'oauth',
+    oauth: {
+      provider: 'facebook',
+      authEndpoint: 'https://www.facebook.com/v19.0/dialog/oauth',
+      scopes: [
+        'pages_show_list',
+        'pages_messaging',
+        'pages_manage_metadata',
+        'pages_read_engagement',
+        'business_management',
+      ],
+      redirectPath: '/oauth/facebook',
+    },
+    note: 'Настройте Facebook App один раз в разделе «OAuth-приложения» ниже — дальше все менеджеры подключают свои страницы в один клик.',
+  },
+  {
+    kind: 'instagram',
+    label: 'Instagram Direct',
+    tagline: 'Войти через Facebook',
+    description:
+      'Instagram Business/Creator аккаунт, привязанный к Facebook-странице. Сообщения Direct приходят в CRM через тот же Graph API.',
+    flow: 'oauth',
+    oauth: {
+      provider: 'facebook',
+      authEndpoint: 'https://www.facebook.com/v19.0/dialog/oauth',
+      scopes: [
+        'pages_show_list',
+        'pages_manage_metadata',
+        'instagram_basic',
+        'instagram_manage_messages',
+        'business_management',
+      ],
+      redirectPath: '/oauth/facebook',
+    },
+    note: 'Нужен Instagram Business/Creator, привязанный к Facebook Page.',
   },
 
   // ── Email ────────────────────────────────────────────────────
@@ -223,7 +245,7 @@ export const CHANNEL_SPECS: ChannelSpec[] = [
       clientIdEnv: 'NEXT_PUBLIC_GOOGLE_CLIENT_ID',
       redirectPath: '/oauth/google',
     },
-    note: 'Нужно один раз зарегистрировать OAuth-клиент в Google Cloud Console и положить NEXT_PUBLIC_GOOGLE_CLIENT_ID в .env.local.',
+    note: 'Настройте Google OAuth-клиент один раз в разделе «OAuth-приложения» ниже.',
   },
   {
     kind: 'email_imap',
