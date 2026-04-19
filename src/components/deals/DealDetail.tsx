@@ -289,8 +289,13 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
   const { missing: missingContractFields, isReady: contractReady } = checkContractReadiness(deal, contact)
 
   const metaFlags = (deal.metadata || {}) as Record<string, unknown>
-  const contractSigned = metaFlags.contract_signed === true || metaFlags.contract_signed === 'true'
-  const prepaymentReceived = metaFlags.prepayment_received === true || metaFlags.prepayment_received === 'true'
+  const initialContractSigned = metaFlags.contract_signed === true || metaFlags.contract_signed === 'true'
+  const initialPrepaymentReceived = metaFlags.prepayment_received === true || metaFlags.prepayment_received === 'true'
+  // Local mirrors — Next router.refresh() doesn't always rehydrate the deal prop
+  // immediately on this page, so we keep optimistic state so the checkboxes feel
+  // responsive. The DB write is the source of truth; we just mirror it here.
+  const [contractSigned, setContractSigned] = useState(initialContractSigned)
+  const [prepaymentReceived, setPrepaymentReceived] = useState(initialPrepaymentReceived)
   const canPromote = deal.pipeline === SALES_PIPELINE && contractReady && contractSigned && prepaymentReceived
   const isSalesPipeline = deal.pipeline === SALES_PIPELINE
 
@@ -393,11 +398,14 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
                   type="checkbox"
                   checked={contractSigned}
                   onChange={async (e) => {
+                    const next = e.target.checked
+                    setContractSigned(next) // optimistic
                     const supabase = createClient()
                     const { data: cur } = await supabase.from('deals').select('metadata').eq('id', deal.id).single()
-                    await supabase.from('deals').update({
-                      metadata: { ...(cur?.metadata || {}), contract_signed: e.target.checked },
+                    const { error } = await supabase.from('deals').update({
+                      metadata: { ...(cur?.metadata || {}), contract_signed: next },
                     }).eq('id', deal.id)
+                    if (error) { setContractSigned(!next); alert('Не удалось сохранить: ' + error.message); return }
                     router.refresh()
                   }}
                   className="h-4 w-4 rounded"
@@ -409,11 +417,14 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
                   type="checkbox"
                   checked={prepaymentReceived}
                   onChange={async (e) => {
+                    const next = e.target.checked
+                    setPrepaymentReceived(next) // optimistic
                     const supabase = createClient()
                     const { data: cur } = await supabase.from('deals').select('metadata').eq('id', deal.id).single()
-                    await supabase.from('deals').update({
-                      metadata: { ...(cur?.metadata || {}), prepayment_received: e.target.checked },
+                    const { error } = await supabase.from('deals').update({
+                      metadata: { ...(cur?.metadata || {}), prepayment_received: next },
                     }).eq('id', deal.id)
+                    if (error) { setPrepaymentReceived(!next); alert('Не удалось сохранить: ' + error.message); return }
                     router.refresh()
                   }}
                   className="h-4 w-4 rounded"
