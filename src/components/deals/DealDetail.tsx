@@ -248,7 +248,10 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
 
         <div className="ml-auto flex items-center gap-2">
           <button
-            onClick={() => window.open(`/deals/contract/?id=${deal.id}`, '_blank')}
+            onClick={() => {
+              const base = process.env.NODE_ENV === 'production' ? '/td-crm' : ''
+              window.open(`${base}/deals/contract/?id=${deal.id}`, '_blank')
+            }}
             title={contractReady
               ? 'Сгенерировать договор'
               : `Заполните обязательные поля (${missingContractFields.length})`}
