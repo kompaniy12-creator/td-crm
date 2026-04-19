@@ -19,6 +19,7 @@ import { ContactLinker } from './ContactLinker'
 import { DealReminders } from './DealReminders'
 import { DealAttachments } from './DealAttachments'
 import { DealTasks } from './DealTasks'
+import { CreateTaskModal } from '@/components/tasks/CreateTaskModal'
 import { DealContract } from './DealContract'
 import { ClientJourney } from './ClientJourney'
 
@@ -155,6 +156,7 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
   const [comment, setComment] = useState('')
   const [meetingAt, setMeetingAt] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [showCreateTask, setShowCreateTask] = useState(false)
 
   const meta = (deal.metadata || {}) as Record<string, string>
 
@@ -693,7 +695,10 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
                   ] as const).map(({ key, label }) => (
                     <button
                       key={key}
-                      onClick={() => setActivityTab(key)}
+                      onClick={() => {
+                        if (key === 'task') { setShowCreateTask(true); return }
+                        setActivityTab(key)
+                      }}
                       className={`rounded-full px-3 py-1 text-xs font-medium transition-colors
                         ${activityTab === key ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-100'}`}
                     >
@@ -806,6 +811,14 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
           )}
         </div>
       </div>
+
+      <CreateTaskModal
+        open={showCreateTask}
+        onClose={() => setShowCreateTask(false)}
+        defaultDealId={deal.id}
+        defaultContactId={contact?.id ?? null}
+        onCreated={() => router.refresh()}
+      />
     </div>
   )
 }
