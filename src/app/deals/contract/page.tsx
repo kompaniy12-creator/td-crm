@@ -102,7 +102,7 @@ function buildContractHtml(deal: Deal, contact: Contact | null) {
   .contract-body .signatures { margin-top: 60px; display: flex; justify-content: space-between; }
   .contract-body .sig { width: 45%; text-align: center; }
   .contract-body .sig-line { border-top: 1px solid #000; margin-top: 50px; padding-top: 6px; font-size: 10pt; }
-  .contract-body .clause-info { margin-top: 40px; }
+  .contract-body .clause-info { margin-top: 40px; page-break-before: always; break-before: page; }
   .contract-body .clause-info h2 { font-size: 12pt; font-weight: bold; text-align: center; margin-bottom: 12px; }
   .contract-body .consent-block { margin-top: 30px; border-top: 1px solid #000; padding-top: 12px; }
   .contract-body .consent-block ul { padding-left: 20px; margin: 10px 0; }
