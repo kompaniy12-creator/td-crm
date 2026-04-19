@@ -65,13 +65,13 @@ export function DealsKanban({ deals, pipeline, onDealClick, onAddDeal }: DealsKa
         return (
           <div
             key={stage}
-            className="flex w-[270px] flex-shrink-0 flex-col rounded-xl bg-white/60 backdrop-blur-md border border-white/50 shadow-sm overflow-hidden group-data-[theme=dark]/theme:bg-slate-900/50 group-data-[theme=dark]/theme:border-white/10"
+            className="flex w-[270px] flex-shrink-0 flex-col rounded-xl bg-white/60 border border-white/50 shadow-sm overflow-hidden group-data-[theme=dark]/theme:bg-slate-900/50 group-data-[theme=dark]/theme:border-white/10"
           >
             {/* Colored top bar */}
             <div className={`h-1.5 w-full ${colorClass}`} />
 
             {/* Column header */}
-            <div className="px-3 py-2.5 bg-white/80 backdrop-blur border-b border-gray-200/60">
+            <div className="px-3 py-2.5 bg-white/80 border-b border-gray-200/60">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-xs font-semibold text-gray-700 leading-tight line-clamp-2 flex-1">
                   {stage}
