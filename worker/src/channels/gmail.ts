@@ -153,6 +153,17 @@ function classifyLabels(labelIds: string[]): {
 // ------------------------------------------------------------
 // Import a single Gmail message (idempotent via external_id dedupe).
 // ------------------------------------------------------------
+async function recomputeThreadUnread(threadId: string) {
+  const { count } = await supabase
+    .from('chat_messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('thread_id', threadId)
+    .eq('unread', true)
+  await supabase.from('chat_threads')
+    .update({ unread_count: count || 0 })
+    .eq('id', threadId)
+}
+
 async function importMessage(gmail: any, it: Integration, id: string) {
   const { data: existing } = await supabase
     .from('chat_messages').select('id,thread_id').eq('external_id', id).maybeSingle()
@@ -165,7 +176,9 @@ async function importMessage(gmail: any, it: Integration, id: string) {
   const cc = hget('Cc')
   const subject = hget('Subject') || '(без темы)'
   const dateHeader = hget('Date')
-  const messageDate = msg.data.internalDate ? new Date(Number(msg.data.internalDate)).toISOString() : null
+  const messageDate = msg.data.internalDate
+    ? new Date(Number(msg.data.internalDate)).toISOString()
+    : null
   const { text, html, attachments } = extractBodies(msg.data.payload, id)
   const emailMatch = from.match(/<(.+?)>/)?.[1] || from
   const displayName = from.replace(/<.+?>/, '').trim().replace(/^"|"$/g, '') || from
@@ -185,7 +198,8 @@ async function importMessage(gmail: any, it: Integration, id: string) {
     title: subject,
   })
 
-  // Sync thread-level metadata from this (latest-seen) message.
+  // Thread-level flags from Gmail labels. `unread_count` is recomputed
+  // below from the per-message UNREAD flag, so we don't touch it here.
   await supabase.from('chat_threads').update({
     gmail_labels: labelIds,
     gmail_category: cls.category,
@@ -203,7 +217,29 @@ async function importMessage(gmail: any, it: Integration, id: string) {
     ...attachments,
   ]
 
-  if (existing?.id) return // already imported — thread metadata just refreshed above
+  if (existing?.id) {
+    // Refresh label-derived fields and date so the UI shows Gmail-correct
+    // state after label changes or schema migrations.
+    await supabase.from('chat_messages').update({
+      unread: cls.unread,
+      message_date: messageDate,
+      body_html: html || null,
+      subject,
+      from_address: from,
+      to_addresses: to,
+      cc_addresses: cc || null,
+      attachments: attachmentList,
+      ...(messageDate ? { created_at: messageDate } : {}),
+    }).eq('external_id', id)
+    await recomputeThreadUnread(threadId)
+    return
+  }
+
+  // Insert with created_at = Gmail internalDate so the thread-touch
+  // trigger picks the actual mail date for last_message_at rather than
+  // "now". The trigger keeps the newest of the two, so out-of-order
+  // backfill still converges to the correct newest date.
+  const createdAtOverride = messageDate ? { created_at: messageDate } : {}
 
   if (isOutbound) {
     await supabase.from('chat_messages').insert({
@@ -220,26 +256,30 @@ async function importMessage(gmail: any, it: Integration, id: string) {
       message_date: messageDate,
       attachments: attachmentList,
       status: 'sent',
+      unread: false,
+      ...createdAtOverride,
     })
   } else {
-    // Use contacts.insertInbound to trigger thread-touch, but extend with email fields.
-    await insertInbound({
-      threadId, integrationId: it.id,
-      externalMessageId: id,
-      senderName: displayName,
+    await supabase.from('chat_messages').insert({
+      thread_id: threadId,
+      direction: 'inbound',
+      external_id: id,
+      sender_name: displayName,
       body: plainBody,
-      attachments: attachmentList,
-    })
-    // Patch in email-specific columns.
-    await supabase.from('chat_messages').update({
       body_html: html || null,
       subject,
       from_address: from,
       to_addresses: to,
       cc_addresses: cc || null,
       message_date: messageDate,
-    }).eq('external_id', id)
+      attachments: attachmentList,
+      status: 'sent',
+      unread: cls.unread,
+      ...createdAtOverride,
+    })
   }
+
+  await recomputeThreadUnread(threadId)
 }
 
 // ------------------------------------------------------------
