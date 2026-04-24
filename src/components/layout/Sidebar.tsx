@@ -9,6 +9,7 @@ import {
   Calendar,
   Mail,
   MessageSquare,
+  FileText,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -32,6 +33,7 @@ const navItems = [
   { href: '/calendar', icon: Calendar, label: 'Календарь' },
   { href: '/mail', icon: Mail, label: 'Почта' },
   { href: '/chats', icon: MessageSquare, label: 'Чаты' },
+  { href: '/documents', icon: FileText, label: 'Документы' },
   { href: '/settings', icon: Settings, label: 'Настройки' },
 ]
 
