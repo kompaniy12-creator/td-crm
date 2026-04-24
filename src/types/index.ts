@@ -293,6 +293,140 @@ export interface Activity {
   created_at: string
 }
 
+// ==================== COMPANY REGISTRATION MODULE ====================
+
+export type FounderRole = 'wspolnik' | 'zarzad' | 'prezes' | 'wiceprezes' | 'prokurent'
+
+export interface DealFounder {
+  id: string
+  deal_id: string
+  contact_id?: string | null
+  entity_type: 'person' | 'legal_entity'
+  full_name?: string | null
+  entity_name?: string | null
+  entity_registry_no?: string | null
+  entity_representative?: string | null
+  delivery_address: string
+  roles: FounderRole[]
+  share_percent?: number | null
+  shares_count?: number | null
+  ubo: boolean
+  position_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface CompanyProfile {
+  company_name_proposed?: string
+  company_name_approved?: string | null
+  registration_mode: 's24'
+  share_capital_pln?: number
+  shares_count?: number
+  share_nominal_pln?: number
+  registered_office?: {
+    street?: string
+    city?: string
+    postal_code?: string
+    voivodeship?: string
+    country?: 'PL'
+  }
+  foreign_majority?: boolean
+  owns_real_property?: boolean
+  fiscal_year_start?: { month: number; day: number }
+  krs_number?: string | null
+  nip?: string | null
+  regon?: string | null
+  bank_account_iban?: string | null
+  // milestones
+  signed_at?: string | null
+  krs_registered_at?: string | null
+  pcc_paid_at?: string | null
+  crbr_submitted_at?: string | null
+}
+
+export interface PkdCode {
+  code: string
+  name_pl: string
+  section: string
+  division?: string
+  group_code?: string
+  class_code?: string
+}
+
+export interface DealPkdLink {
+  deal_id: string
+  pkd_code: string
+  is_main: boolean
+  position_order: number
+}
+
+export interface ServiceItem {
+  id: string
+  code?: string | null
+  name_pl: string
+  name_ru?: string | null
+  description?: string | null
+  default_price_pln: number
+  applies_to_pipeline?: string | null
+  category?: string | null
+  active: boolean
+  position_order: number
+}
+
+export interface DealServiceItem {
+  id: string
+  deal_id: string
+  service_item_id?: string | null
+  name: string
+  quantity: number
+  unit_price_pln: number
+  total_pln: number
+  paid: boolean
+  paid_at?: string | null
+  note?: string | null
+  position_order: number
+  created_at: string
+}
+
+export interface PipelineStageTemplate {
+  id: string
+  pipeline: string
+  stage: string
+  order_index: number
+  task_title: string
+  task_description?: string | null
+  default_assignee_role?: 'lawyer' | 'accountant' | 'manager' | 'assistant' | null
+  due_offset_hours?: number | null
+  auto_create_on_enter: boolean
+  priority: TaskPriority
+  active: boolean
+}
+
+export interface DocumentTemplate {
+  id: string
+  code: string
+  name: string
+  description?: string | null
+  pipeline?: string | null
+  engine: 'docx' | 'pdf_form' | 'html'
+  storage_path?: string | null
+  required_profile_keys: string[]
+  required_founder_roles: string[]
+  active: boolean
+  position_order: number
+}
+
+export interface DealGeneratedDocument {
+  id: string
+  deal_id: string
+  template_id?: string | null
+  template_code: string
+  attachment_id?: string | null
+  generated_by?: string | null
+  generated_at: string
+  params: Record<string, unknown>
+}
+
 // ==================== PIPELINE STAGES ====================
 
 export const PIPELINE_STAGES: Record<DealPipeline, string[]> = {
@@ -375,13 +509,18 @@ export const PIPELINE_STAGES: Record<DealPipeline, string[]> = {
     'Перераспределен',
     'Закрыт',
   ],
+  // Внутренний ключ стадии (для pipeline_stage_templates.stage и auto-checklist):
+  // 'intake' | 'preparation' | 'signing' | 'krs_filing' | 'tax_payment'
+  // | 'awaiting_krs' | 'post_registration' | 'closed'
+  // Лейблы видны в UI.
   company_registration: [
-    'Новая заявка',
-    'Консультация',
-    'Сбор документов',
-    'Регистрация',
-    'Ожидание КРС',
-    'Компания зарегистрирована',
+    'Интейк / KYC',
+    'Подготовка',
+    'Подписание устава',
+    'Подача в KRS',
+    'Оплата налогов',
+    'Ожидание KRS',
+    'Post-registration',
     'Закрыт',
   ],
 }
@@ -406,6 +545,35 @@ export const SALES_FINAL_STAGE = 'Предоплата получена'
 export const CLIENT_INITIAL_STAGE = 'Новый проект'
 export const CLIENT_PIPELINE: DealPipeline = 'legalization'
 export const SALES_PIPELINE: DealPipeline = 'sales'
+
+/**
+ * Stable internal keys for company_registration stages. The visible Russian
+ * labels in `PIPELINE_STAGES.company_registration` can be renamed freely; the
+ * DB (pipeline_stage_templates.stage, triggers for deadlines) always uses
+ * these keys. Order matches PIPELINE_STAGES.
+ */
+export const COMPANY_REGISTRATION_STAGE_KEYS = [
+  'intake',
+  'preparation',
+  'signing',
+  'krs_filing',
+  'tax_payment',
+  'awaiting_krs',
+  'post_registration',
+  'closed',
+] as const
+export type CompanyRegistrationStageKey = typeof COMPANY_REGISTRATION_STAGE_KEYS[number]
+
+export const COMPANY_REGISTRATION_STAGE_LABELS: Record<CompanyRegistrationStageKey, string> = {
+  intake:            'Интейк / KYC',
+  preparation:       'Подготовка',
+  signing:           'Подписание устава',
+  krs_filing:        'Подача в KRS',
+  tax_payment:       'Оплата налогов',
+  awaiting_krs:      'Ожидание KRS',
+  post_registration: 'Post-registration',
+  closed:            'Закрыт',
+}
 
 export const SOURCE_LABELS: Record<LeadSource, string> = {
   website: 'Сайт',
