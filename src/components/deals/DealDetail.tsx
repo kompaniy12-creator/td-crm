@@ -571,8 +571,12 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
                 <EditableField label="Дата рождения" value={contact.date_of_birth} target={{ kind: 'contact', contactId: contact.id, column: 'date_of_birth' }} type="date" />
                 <EditableField label="Серия паспорта" value={contact.passport_series} target={{ kind: 'contact', contactId: contact.id, column: 'passport_series' }} required />
                 <EditableField label="Номер паспорта" value={contact.passport_number} target={{ kind: 'contact', contactId: contact.id, column: 'passport_number' }} required />
-                <EditableField label="МОС номер" value={contact.mos_number} target={{ kind: 'contact', contactId: contact.id, column: 'mos_number' }} />
-                <EditableField label="ПИО номер" value={contact.pio_number} target={{ kind: 'contact', contactId: contact.id, column: 'pio_number' }} />
+                {!isCompanyReg && (
+                  <>
+                    <EditableField label="МОС номер" value={contact.mos_number} target={{ kind: 'contact', contactId: contact.id, column: 'mos_number' }} />
+                    <EditableField label="ПИО номер" value={contact.pio_number} target={{ kind: 'contact', contactId: contact.id, column: 'pio_number' }} />
+                  </>
+                )}
                 <EditableField label="Страна" value={contact.country} target={{ kind: 'contact', contactId: contact.id, column: 'country' }} />
                 <EditableField label="Город" value={contact.city} target={{ kind: 'contact', contactId: contact.id, column: 'city' }} required />
                 <EditableField label="Адрес" value={contact.address} target={{ kind: 'contact', contactId: contact.id, column: 'address' }} required />
@@ -613,9 +617,13 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
             <EditableField label="Сумма доплаты (2 часть)" value={meta.second_payment} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'second_payment' }} type="number" required />
             <EditableField label="Дата доплаты" value={meta.second_payment_date} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'second_payment_date' }} type="date" required />
             <EditableField label="Остаток оплаты (%)" value={meta.payment_remainder} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'payment_remainder' }} />
-            <EditableField label="Дата и время встречи" value={meta.meeting_datetime} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'meeting_datetime' }} />
-            <EditableField label="Специалист (встреча)" value={meta.meeting_specialist} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'meeting_specialist' }} />
-            <EditableField label="Тип услуги (zezwolenie na pobyt czasowy/stały/rezydenta UE)" value={meta.service_type} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'service_type' }} required />
+            {!isCompanyReg && (
+              <>
+                <EditableField label="Дата и время встречи" value={meta.meeting_datetime} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'meeting_datetime' }} />
+                <EditableField label="Специалист (встреча)" value={meta.meeting_specialist} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'meeting_specialist' }} />
+                <EditableField label="Тип услуги (zezwolenie na pobyt czasowy/stały/rezydenta UE)" value={meta.service_type} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'service_type' }} required />
+              </>
+            )}
 
             <div className="py-1.5">
               <div className="text-xs text-gray-400 leading-tight">Дата начала</div>
@@ -624,32 +632,40 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
 
             <EditableField label="Ответственный" value={deal.assigned_to} target={{ kind: 'deal', dealId: deal.id, column: 'assigned_to' }} />
             <EditableField label="Ссылка на папку с документами" value={meta.docs_folder_link} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'docs_folder_link' }} />
-            <EditableField label="Пакет" value={meta.package} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'package' }} />
-            <EditableField label="Скан документов загрузил" value={meta.docs_uploaded} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'docs_uploaded' }} />
-            <EditableField label="Дата подачи документов" value={meta.submission_date} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'submission_date' }} type="date" />
-            <EditableField label="Комментарий к встрече" value={meta.meeting_comment} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'meeting_comment' }} type="textarea" />
+            {!isCompanyReg && (
+              <>
+                <EditableField label="Пакет" value={meta.package} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'package' }} />
+                <EditableField label="Скан документов загрузил" value={meta.docs_uploaded} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'docs_uploaded' }} />
+                <EditableField label="Дата подачи документов" value={meta.submission_date} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'submission_date' }} type="date" />
+                <EditableField label="Комментарий к встрече" value={meta.meeting_comment} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'meeting_comment' }} type="textarea" />
+              </>
+            )}
           </div>
 
-          {/* ДАННЫЕ ДЕЛА */}
-          <div>
-            <SectionHeader title="ДАННЫЕ ДЕЛА" />
-            <EditableField label="Место подачи" value={meta.submission_place} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'submission_place' }} />
-            <EditableField label="Пароль" value={meta.case_password} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'case_password' }} />
-            <EditableField label="Номер дела" value={meta.case_number} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'case_number' }} />
-            <EditableField label="На каком основании" value={meta.grounds} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'grounds' }} />
-            <EditableField label="Фирма" value={meta.company} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'company' }} />
-            <EditableField label="Доверенность" value={meta.power_of_attorney} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'power_of_attorney' }} />
-          </div>
+          {/* ДАННЫЕ ДЕЛА — только для легализации (для company_registration данные компании во вкладке Spółka) */}
+          {!isCompanyReg && (
+            <div>
+              <SectionHeader title="ДАННЫЕ ДЕЛА" />
+              <EditableField label="Место подачи" value={meta.submission_place} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'submission_place' }} />
+              <EditableField label="Пароль" value={meta.case_password} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'case_password' }} />
+              <EditableField label="Номер дела" value={meta.case_number} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'case_number' }} />
+              <EditableField label="На каком основании" value={meta.grounds} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'grounds' }} />
+              <EditableField label="Фирма" value={meta.company} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'company' }} />
+              <EditableField label="Доверенность" value={meta.power_of_attorney} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'power_of_attorney' }} />
+            </div>
+          )}
 
-          {/* ПРОПИСКА */}
-          <div>
-            <SectionHeader title="ПРОПИСКА (МЕСТО ПРОЖИВАНИЯ В ПОЛЬШЕ)" />
-            <EditableField label="Воеводство" value={meta.voivodeship} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'voivodeship' }} />
-            <EditableField label="Город" value={meta.reg_city} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'reg_city' }} />
-            <EditableField label="Улица" value={meta.street} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'street' }} />
-            <EditableField label="Номер дома / кв." value={meta.house_number} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'house_number' }} />
-            <EditableField label="Почтовый индекс" value={meta.postal_code} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'postal_code' }} />
-          </div>
+          {/* ПРОПИСКА — место проживания в Польше. Не нужна для регистрации компании (siedziba spółki — в Spółka-вкладке). */}
+          {!isCompanyReg && (
+            <div>
+              <SectionHeader title="ПРОПИСКА (МЕСТО ПРОЖИВАНИЯ В ПОЛЬШЕ)" />
+              <EditableField label="Воеводство" value={meta.voivodeship} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'voivodeship' }} />
+              <EditableField label="Город" value={meta.reg_city} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'reg_city' }} />
+              <EditableField label="Улица" value={meta.street} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'street' }} />
+              <EditableField label="Номер дома / кв." value={meta.house_number} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'house_number' }} />
+              <EditableField label="Почтовый индекс" value={meta.postal_code} target={{ kind: 'deal_meta', dealId: deal.id, metaKey: 'postal_code' }} />
+            </div>
+          )}
 
           {/* ДОГОВОР */}
           <DealContract
