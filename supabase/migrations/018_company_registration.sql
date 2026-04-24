@@ -189,7 +189,7 @@ ALTER TABLE public.pipeline_stage_templates   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.document_templates         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.deal_generated_documents   ENABLE ROW LEVEL SECURITY;
 
-DO $$ BEGIN
+DO $$ DECLARE t text; BEGIN
   FOR t IN SELECT unnest(ARRAY[
     'deal_founders','pkd_sections','pkd_codes','deal_pkd_codes',
     'service_items','deal_service_items','pipeline_stage_templates',
@@ -210,7 +210,7 @@ CREATE OR REPLACE FUNCTION public.set_updated_at() RETURNS trigger AS $$
 BEGIN NEW.updated_at = now(); RETURN NEW; END
 $$ LANGUAGE plpgsql;
 
-DO $$ BEGIN
+DO $$ DECLARE t text; BEGIN
   FOR t IN SELECT unnest(ARRAY[
     'deal_founders','service_items','pipeline_stage_templates','document_templates'
   ]) LOOP
