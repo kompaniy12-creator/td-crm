@@ -21,6 +21,7 @@ import { DealAttachments } from './DealAttachments'
 import { DealTasks } from './DealTasks'
 import { CreateTaskModal } from '@/components/tasks/CreateTaskModal'
 import { sendToContact, type SendChannel } from '@/lib/chats/sendToContact'
+import { CompanyRegistrationTab } from '@/components/deals/company-reg/CompanyRegistrationTab'
 import { DealContract } from './DealContract'
 import { ClientJourney } from './ClientJourney'
 
@@ -152,7 +153,8 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
   const router = useRouter()
   const { user: currentUser } = useCurrentUser()
   const stages = PIPELINE_STAGES[deal.pipeline] || []
-  const [activeTab, setActiveTab] = useState<'general' | 'links' | 'history'>('general')
+  const isCompanyReg = deal.pipeline === 'company_registration'
+  const [activeTab, setActiveTab] = useState<'general' | 'links' | 'history' | 'spolka'>('general')
   const [activityTab, setActivityTab] = useState<'task' | 'comment' | 'message' | 'meeting'>('comment')
   const [comment, setComment] = useState('')
   const [meetingAt, setMeetingAt] = useState('')
@@ -657,8 +659,11 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
         <div className="flex flex-1 flex-col overflow-hidden">
           {/* Tabs */}
           <div className="flex items-center gap-0 border-b border-gray-200 bg-white px-4">
-            {(['general', 'links', 'history'] as const).map((tab, i) => {
-              const labels = { general: 'Общие', links: 'Связи', history: 'История' }
+            {(isCompanyReg
+              ? (['general', 'spolka', 'links', 'history'] as const)
+              : (['general', 'links', 'history'] as const)
+            ).map((tab) => {
+              const labels = { general: 'Общие', spolka: 'Spółka', links: 'Связи', history: 'История' } as const
               return (
                 <button
                   key={tab}
@@ -691,6 +696,15 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
                 </div>
               )}
             </div>
+          )}
+
+          {/* TAB: Spółka — company registration module (visible only for pipeline=company_registration) */}
+          {activeTab === 'spolka' && isCompanyReg && (
+            <CompanyRegistrationTab
+              dealId={deal.id}
+              pipeline={deal.pipeline}
+              metadata={deal.metadata}
+            />
           )}
 
           {/* TAB: История — Activities only */}
