@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Building2, CheckCircle2, AlertTriangle, Save } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { CompanyProfile } from '@/types'
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
+import { ensureDeadlineTasks } from '@/lib/companyReg/autoDeadlines'
 
 interface Props {
   dealId: string
@@ -32,6 +34,7 @@ function emptyProfile(): CompanyProfile {
 }
 
 export function CompanyProfilePanel({ dealId, initial, onSaved }: Props) {
+  const { user: currentUser } = useCurrentUser()
   const [profile, setProfile] = useState<CompanyProfile>(() => ({ ...emptyProfile(), ...(initial || {}) }))
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -67,8 +70,12 @@ export function CompanyProfilePanel({ dealId, initial, onSaved }: Props) {
     setDirty(false)
     setFlash({ kind: 'ok', text: 'Сохранено' })
     onSaved?.(profile)
+    // Spawn / update PCC-3 and CRBR tasks if milestones are set.
+    if (currentUser && (profile.signed_at || profile.krs_registered_at)) {
+      ensureDeadlineTasks({ dealId, profile, createdByUserId: currentUser.id }).catch(() => {})
+    }
     setTimeout(() => setFlash(null), 2500)
-  }, [dealId, profile, onSaved])
+  }, [dealId, profile, onSaved, currentUser])
 
   // Auto-derived share nominal
   useEffect(() => {

@@ -22,6 +22,7 @@ import { DealTasks } from './DealTasks'
 import { CreateTaskModal } from '@/components/tasks/CreateTaskModal'
 import { sendToContact, type SendChannel } from '@/lib/chats/sendToContact'
 import { CompanyRegistrationTab } from '@/components/deals/company-reg/CompanyRegistrationTab'
+import { applyStageChecklist, companyRegStageKey } from '@/lib/companyReg/autoChecklist'
 import { DealContract } from './DealContract'
 import { ClientJourney } from './ClientJourney'
 
@@ -304,6 +305,19 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
     }
     const supabase = createClient()
     await supabase.from('deals').update({ stage }).eq('id', deal.id)
+    // Auto-create checklist tasks for the new stage (company_registration only).
+    if (deal.pipeline === 'company_registration' && currentUser) {
+      const stageKey = companyRegStageKey(stage)
+      if (stageKey) {
+        await applyStageChecklist({
+          dealId: deal.id,
+          pipeline: 'company_registration',
+          stageKey,
+          createdByUserId: currentUser.id,
+        })
+        setTasksReloadToken((n) => n + 1)
+      }
+    }
     router.refresh()
   }
 
