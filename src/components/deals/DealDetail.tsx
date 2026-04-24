@@ -681,9 +681,6 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
 
         {/* ─── RIGHT PANEL ─── */}
         <div className="flex flex-1 flex-col overflow-hidden">
-          {/* Pinned active tasks — visible across all tabs */}
-          <PinnedActiveTasks dealId={deal.id} reloadToken={tasksReloadToken} />
-
           {/* Tabs */}
           <div className="flex items-center gap-0 border-b border-gray-200 bg-white px-4">
             {(isCompanyReg
@@ -895,6 +892,9 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
                   </div>
                 </div>
               </div>
+
+              {/* Pinned active tasks — right below the input */}
+              <PinnedActiveTasks dealId={deal.id} reloadToken={tasksReloadToken} />
 
               {/* Feed items */}
               <div className="flex-1 overflow-y-auto p-3 space-y-2" style={{ scrollbarWidth: 'thin' }}>
