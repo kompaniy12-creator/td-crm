@@ -3,7 +3,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { FileText, Download, RefreshCw, AlertCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { DocumentTemplate, DealGeneratedDocument } from '@/types'
+import type {
+  DocumentTemplate,
+  DealGeneratedDocument,
+  CompanyProfile,
+  DealFounder,
+} from '@/types'
+import {
+  generateDocumentBlob,
+  validateTemplateData,
+} from '@/lib/companyReg/docGenerators'
 
 interface Props { dealId: string }
 
@@ -34,18 +43,85 @@ export function DealDocumentsPanel({ dealId }: Props) {
   }, [dealId])
   useEffect(() => { load() }, [load])
 
+  /**
+   * Client-side generation (GitHub Pages is static — no server routes):
+   *  1. Load deal.metadata.company_profile + deal_founders
+   *  2. Validate via shared library
+   *  3. Build DOCX via `docx` (Packer.toBlob — browser-safe)
+   *  4. Upload to Supabase Storage bucket `deal-attachments`
+   *  5. Insert attachments + deal_generated_documents rows
+   */
   async function generate(tpl: DocumentTemplate) {
     setBusy(tpl.code); setErr(null)
+    const supabase = createClient()
     try {
-      const res = await fetch('/api/company-reg/generate-document', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dealId, templateCode: tpl.code }),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: 'Ошибка генерации' }))
-        throw new Error(body.error || `HTTP ${res.status}`)
+      const { data: authData } = await supabase.auth.getUser()
+      const userId = authData?.user?.id
+      if (!userId) throw new Error('Необходима авторизация')
+
+      // 1. Load profile + founders
+      const [dealRes, foundersRes, tplRes] = await Promise.all([
+        supabase.from('deals').select('metadata').eq('id', dealId).maybeSingle(),
+        supabase.from('deal_founders').select('*').eq('deal_id', dealId).order('position_order'),
+        supabase.from('document_templates').select('id').eq('code', tpl.code).maybeSingle(),
+      ])
+      if (!dealRes.data) throw new Error('Сделка не найдена')
+
+      const metadata = (dealRes.data.metadata as Record<string, unknown> | null) || {}
+      const profile = (metadata.company_profile as CompanyProfile | undefined) || null
+      const founders = (foundersRes.data as DealFounder[]) || []
+
+      // 2. Validate
+      const missing = validateTemplateData(tpl.code, { profile, founders })
+      if (missing.length > 0) {
+        throw new Error('Не хватает данных: ' + missing.join(', '))
       }
+      if (!profile) throw new Error('Профиль компании не заполнен')
+
+      // 3. Build DOCX
+      const built = await generateDocumentBlob(tpl.code, { profile, founders })
+      if (!built) throw new Error('Генератор для этого шаблона не найден')
+
+      // 4. Upload
+      const ts = Date.now()
+      const storagePath = `deal-${dealId}/generated/${tpl.code}-${ts}.docx`
+      const mime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      const { error: upErr } = await supabase.storage
+        .from('deal-attachments')
+        .upload(storagePath, built.blob, { contentType: mime, upsert: false })
+      if (upErr) throw new Error('Ошибка загрузки: ' + upErr.message)
+
+      // 5. attachments row
+      const { data: att, error: attErr } = await supabase
+        .from('attachments')
+        .insert({
+          deal_id: dealId,
+          storage_path: storagePath,
+          file_name: built.fileName,
+          mime_type: mime,
+          size_bytes: built.blob.size,
+          uploaded_by: userId,
+        })
+        .select('id')
+        .single()
+      if (attErr || !att) {
+        await supabase.storage.from('deal-attachments').remove([storagePath])
+        throw new Error('Ошибка регистрации файла: ' + (attErr?.message || 'нет id'))
+      }
+
+      // 6. deal_generated_documents row
+      const { error: genErr } = await supabase
+        .from('deal_generated_documents')
+        .insert({
+          deal_id: dealId,
+          template_id: tplRes.data?.id || null,
+          template_code: tpl.code,
+          attachment_id: att.id,
+          generated_by: userId,
+          params: {},
+        })
+      if (genErr) throw new Error('Ошибка записи журнала: ' + genErr.message)
+
       await load()
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Не удалось сгенерировать')

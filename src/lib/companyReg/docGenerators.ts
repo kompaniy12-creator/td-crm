@@ -272,10 +272,10 @@ export function buildUchwalaZarzad(params: { profile: CompanyProfile; founders: 
 // Dispatcher
 // ═══════════════════════════════════════════════════════════════
 
-export async function generateDocumentBuffer(
+export async function generateDocumentBlob(
   templateCode: string,
   data: { profile: CompanyProfile; founders: DealFounder[] },
-): Promise<{ buffer: Buffer; fileName: string } | null> {
+): Promise<{ blob: Blob; fileName: string } | null> {
   let doc: Document | null = null
   let fileName = ''
   switch (templateCode) {
@@ -299,8 +299,10 @@ export async function generateDocumentBuffer(
       return null
   }
   if (!doc) return null
-  const buffer = await Packer.toBuffer(doc)
-  return { buffer, fileName }
+  // Packer.toBlob works in the browser; server-only `toBuffer` intentionally
+  // avoided so the module is safe to import from client components.
+  const blob = await Packer.toBlob(doc)
+  return { blob, fileName }
 }
 
 export const GENERATABLE_CODES = [
