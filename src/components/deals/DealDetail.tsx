@@ -19,6 +19,7 @@ import { ContactLinker } from './ContactLinker'
 import { DealReminders } from './DealReminders'
 import { DealAttachments } from './DealAttachments'
 import { DealTasks } from './DealTasks'
+import { PinnedActiveTasks } from './PinnedActiveTasks'
 import { CreateTaskModal } from '@/components/tasks/CreateTaskModal'
 import { sendToContact, type SendChannel } from '@/lib/chats/sendToContact'
 import { CompanyRegistrationTab } from '@/components/deals/company-reg/CompanyRegistrationTab'
@@ -675,18 +676,14 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
             onChanged={() => router.refresh()}
           />
 
-          {/* ЗАДАЧИ */}
-          <DealTasks dealId={deal.id} contactId={contact?.id ?? null} reloadToken={tasksReloadToken} />
-
-          {/* НАПОМИНАНИЯ */}
-          <DealReminders dealId={deal.id} contactId={contact?.id ?? null} />
-
-          {/* ФАЙЛЫ */}
-          <DealAttachments dealId={deal.id} />
+          {/* Задачи/Напоминания/Файлы перенесены в правую панель — левая только данные. */}
         </div>
 
         {/* ─── RIGHT PANEL ─── */}
         <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Pinned active tasks — visible across all tabs */}
+          <PinnedActiveTasks dealId={deal.id} reloadToken={tasksReloadToken} />
+
           {/* Tabs */}
           <div className="flex items-center gap-0 border-b border-gray-200 bg-white px-4">
             {(isCompanyReg
@@ -902,7 +899,7 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
               {/* Feed items */}
               <div className="flex-1 overflow-y-auto p-3 space-y-2" style={{ scrollbarWidth: 'thin' }}>
                 {feedItems.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
                     <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center mb-3">
                       <CheckSquare className="h-6 w-6 text-green-500" />
                     </div>
@@ -919,6 +916,17 @@ function DealDetailInner({ deal, contact, activities, comments }: Props) {
                     </div>
                   ))
                 )}
+
+                {/* Full tasks / reminders / files — inline under the chat feed */}
+                <div className="mt-4 border-t border-gray-200 pt-3">
+                  <DealTasks dealId={deal.id} contactId={contact?.id ?? null} reloadToken={tasksReloadToken} />
+                </div>
+                <div className="border-t border-gray-200 pt-3">
+                  <DealReminders dealId={deal.id} contactId={contact?.id ?? null} />
+                </div>
+                <div className="border-t border-gray-200 pt-3">
+                  <DealAttachments dealId={deal.id} />
+                </div>
               </div>
             </div>
           </div>
